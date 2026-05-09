@@ -1,0 +1,112 @@
+version: '1.0'
+
+# Project Configuration for RunAdvisor
+
+project:
+  name: RunAdvisor
+  description: AI-Powered Running Training Advisor with MEARN Stack
+  version: 1.0.0
+  author: Your Name
+  
+technologies:
+  frontend:
+    - React 18.x
+    - React Router DOM
+    - Axios
+    - TailwindCSS
+  backend:
+    - Node.js 18.x
+    - Express.js
+    - MongoDB
+    - JWT Authentication
+  database:
+    - MongoDB 7.0
+    - Vector Search
+    - GeoJSON Indexing
+  devops:
+    - Docker & Docker Compose
+    - Multi-stage builds
+
+services:
+  frontend:
+    port: 3000
+    url: http://localhost:3000
+    volumes:
+      - './frontend/src:/app/src'
+      - './frontend/public:/app/public'
+  
+  backend:
+    port: 5000
+    url: http://localhost:5000
+    volumes:
+      - './backend:/app'
+      - '/app/node_modules'
+  
+  mongodb:
+    port: 27017
+    username: admin
+    password: password
+    volumes:
+      - 'mongodb-data:/data/db'
+
+features:
+  - User authentication with JWT
+  - Strava API integration
+  - Vector similarity search
+  - AI-powered recommendations
+  - Activity tracking and analytics
+  - Weekly/monthly statistics
+  - Responsive React UI
+  - RESTful API
+  - MongoDB with vector indexing
+  - Docker containerization
+
+development:
+  scripts:
+    start: 'docker-compose up --build'
+    stop: 'docker-compose down'
+    logs: 'docker-compose logs -f'
+    reset: 'docker-compose down -v'
+  
+  commands:
+    backend-dev: 'cd backend && npm run dev'
+    frontend-dev: 'cd frontend && npm start'
+    mongodb-shell: 'docker-compose exec mongodb mongosh -u admin -p password'
+
+files:
+  documentation:
+    - README.md
+    - QUICKSTART.md
+    - ARCHITECTURE.md
+  
+  configuration:
+    - .env.example
+    - docker-compose.yml
+    - .dockerignore
+    - .gitignore
+  
+  scripts:
+    - start.sh
+    - start.bat
+    - dev-cli.sh
+
+api_routes:
+  - /api/auth/**
+  - /api/activities/**
+  - /api/strava/**
+  - /api/recommendations/**
+  - /api/vector-search/**
+
+database_collections:
+  - users
+  - activities
+  - recommendations
+
+recommended_extensions:
+  vscode:
+    - ES7+ React/Redux/React-Native snippets
+    - Prettier - Code formatter
+    - ESLint
+    - MongoDB for VS Code
+    - Docker
+    - REST Client

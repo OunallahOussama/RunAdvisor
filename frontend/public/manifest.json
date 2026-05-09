@@ -1,0 +1,10 @@
+{
+  "short_name": "RunAdvisor",
+  "name": "RunAdvisor Training Coach",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0f172a",
+  "background_color": "#0f172a",
+  "description": "RunAdvisor is a running training advisor for workout planning, race preparation, and activity review."
+}

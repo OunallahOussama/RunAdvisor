@@ -1,0 +1,76 @@
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: runadvisor-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: runadvisor
+    volumes:
+      - mongodb-data:/data/db
+      - ./docker/init-mongodb.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - runadvisor-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: runadvisor-backend
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: ${MONGODB_URI:-mongodb://admin:password@mongodb:27017/runadvisor?authSource=admin}
+      JWT_SECRET: your_jwt_secret_key_change_in_production
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
+      STRAVA_REDIRECT_URI: http://localhost:3000/callback
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      PORT: 5000
+    networks:
+      - runadvisor-network
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm start
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_BASE_URL: http://localhost:5000/api
+        REACT_APP_STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
+        REACT_APP_STRAVA_REDIRECT_URI: http://localhost:3000/callback
+    container_name: runadvisor-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_BASE_URL: http://localhost:5000/api
+      REACT_APP_STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
+      REACT_APP_STRAVA_REDIRECT_URI: http://localhost:3000/callback
+    depends_on:
+      - backend
+    networks:
+      - runadvisor-network
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+
+volumes:
+  mongodb-data:
+
+networks:
+  runadvisor-network:
+    driver: bridge
