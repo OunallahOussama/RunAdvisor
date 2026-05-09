@@ -1,34 +1,143 @@
-## RunAdvisor on EC2 with Docker
+## RunAdvisor on EC2 (Docker + Nginx)
 
-### 1) Prepare environment
+This setup keeps Nginx on host ports `80/443` and exposes the frontend container on `localhost:8080`.
 
-1. Copy `.env.ec2.example` to `.env.ec2`.
-2. Update all placeholder values.
-3. Open EC2 security group ports:
-   - `80` for frontend
-   - `5000` only if you need direct API access (optional)
-
-### 2) Start services
+### 1) Install Docker on Amazon Linux
 
 ```bash
+sudo dnf -y update
+sudo dnf -y install docker
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+newgrp docker
+```
+
+### 2) Ensure Docker Compose is available
+
+Try plugin first:
+
+```bash
+docker compose version
+```
+
+If plugin is unavailable, install standalone binary:
+
+```bash
+sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+  -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose version
+```
+
+### 3) Verify buildx version and context
+
+BuildKit/buildx should be `>= 0.17` for reliable builds.
+
+```bash
+docker buildx version
+sudo docker buildx version
+```
+
+If root and user contexts differ, run compose commands consistently with the same context (all `docker ...` or all `sudo docker ...`) and recreate the builder in that context if needed:
+
+```bash
+docker buildx create --name runadvisor-builder --use || true
+docker buildx inspect --bootstrap
+```
+
+### 4) Configure environment and start services
+
+```bash
+cp .env.ec2.example .env.ec2
+# edit .env.ec2 with production values
+```
+
+Use `--env-file` on every compose command:
+
+```bash
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml pull
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs --tail=100
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml down
 ```
 
-### 3) Verify
+### 5) Configure Nginx reverse proxy (80/443 -> localhost:8080)
+
+Example server block:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Validate and reload:
 
 ```bash
-docker compose -f docker-compose.ec2.yml ps
-curl http://localhost/health
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-### 4) Stop services
+### Frontend recovery quick path
+
+If `frontend` is down/missing while `backend` and `mongodb` are running:
 
 ```bash
-docker compose -f docker-compose.ec2.yml down
+# from repo root on EC2
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build frontend
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f --tail=200 frontend
 ```
 
-### Notes
+Create the host nginx config if missing:
 
-- Frontend is exposed on port `80`.
-- Backend is private to the Docker network and used by the frontend/app services.
-- MongoDB data is persisted in the `mongodb-data` Docker volume.
+```bash
+sudo tee /etc/nginx/conf.d/runadvisor.conf > /dev/null <<'EOF'
+server {
+    listen 80;
+    server_name runadvisor.fit www.runadvisor.fit;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+EOF
+```
+
+Reload and validate local path:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -I http://127.0.0.1:8080
+curl -I http://127.0.0.1
+```
+
+### 6) Optional HTTPS with certbot
+
+```bash
+sudo dnf -y install certbot python3-certbot-nginx
+sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo certbot renew --dry-run
+```
+
+### Security group guidance
+
+- Open inbound `80` and `443` to the internet.
+- Keep `8080` closed publicly (localhost-only target behind Nginx).
+- Keep backend/internal ports private unless explicitly required.

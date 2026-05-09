@@ -110,6 +110,10 @@ docker-compose up --build
 # MongoDB: localhost:27017
 ```
 
+### EC2 Deployment
+
+For production-oriented EC2 deployment (Docker, Compose fallback, Nginx reverse proxy, optional HTTPS), see `EC2-DOCKER.md`.
+
 ### Local Development
 
 **Backend:**
