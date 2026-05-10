@@ -62,14 +62,33 @@ docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs --tail=100
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml down
 ```
 
-### 5) Configure Nginx reverse proxy (80/443 -> localhost:8080)
+### 5) Configure Nginx reverse proxy
 
-Example server block:
+Compose publishes:
+
+- **Frontend** on host `8080` (`8080:3000`)
+- **Backend API** on host `5000` (`5000:5000`) so Nginx can proxy `/api/` to Express
+
+Without `location /api/`, requests like `/api/strava/authenticate` hit the React app and return **502** or fail Strava with a **Network Error**.
+
+Example server block (HTTP):
 
 ```nginx
 server {
     listen 80;
     server_name your-domain.com www.your-domain.com;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000/api/;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
 
     location / {
         proxy_pass http://127.0.0.1:8080;
@@ -81,6 +100,21 @@ server {
     }
 }
 ```
+
+Validate upstream before relying on the domain:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5000/health
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
+```
+
+Expect `200` for both. Then:
+
+```bash
+curl -i http://127.0.0.1/api/auth/me
+```
+
+Expect `401` JSON when not logged in (not `502`).
 
 Validate and reload:
 
@@ -108,6 +142,18 @@ server {
     listen 80;
     server_name runadvisor.fit www.runadvisor.fit;
 
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000/api/;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
@@ -125,7 +171,8 @@ Reload and validate local path:
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 curl -I http://127.0.0.1:8080
-curl -I http://127.0.0.1
+curl -I http://127.0.0.1:5000/health
+curl -I http://127.0.0.1/api/auth/me
 ```
 
 ### 6) Optional HTTPS with certbot
@@ -139,5 +186,4 @@ sudo certbot renew --dry-run
 ### Security group guidance
 
 - Open inbound `80` and `443` to the internet.
-- Keep `8080` closed publicly (localhost-only target behind Nginx).
-- Keep backend/internal ports private unless explicitly required.
+- Keep `8080` and `5000` closed publicly (both are localhost targets behind Nginx). Only `80`/`443` need to be open for users.
