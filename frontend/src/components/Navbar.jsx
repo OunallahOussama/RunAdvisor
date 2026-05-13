@@ -1,9 +1,26 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import ThemeToggleButton from './ThemeToggleButton';
+import {
+  ActivityIcon,
+  CoachIcon,
+  DashboardIcon,
+  InstallIcon,
+  RunAdvisorMark,
+  SyncIcon
+} from './icons';
 
-function Navbar({ onLogout }) {
+const navigationItems = [
+  { icon: DashboardIcon, label: 'Dashboard', to: '/dashboard' },
+  { icon: ActivityIcon, label: 'Activities', to: '/activities' },
+  { icon: CoachIcon, label: 'Coach Review', to: '/recommendations' },
+  { icon: SyncIcon, label: 'Strava', to: '/strava-connect' }
+];
+
+function Navbar({ onLogout, user, canInstall, onInstall }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const displayName = user?.name || user?.email || 'Runner';
 
   const handleLogout = () => {
     onLogout();
@@ -13,43 +30,67 @@ function Navbar({ onLogout }) {
   const closeMenu = () => setMenuOpen(false);
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur-lg">
+    <nav className="topbar">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-        <Link to="/dashboard" onClick={closeMenu} className="inline-flex items-center gap-3 text-lg font-bold text-slate-100">
-          <span className="text-orange-400">🏃</span>
-          RunAdvisor
+        <Link to="/dashboard" onClick={closeMenu} className="brand-link">
+          <span className="brand-mark" aria-hidden="true">
+            <RunAdvisorMark size={24} />
+          </span>
+          <span>
+            RunAdvisor
+            <span className="hidden text-sm font-medium sm:inline" style={{ color: 'var(--text-tertiary)' }}> Mobile coach</span>
+          </span>
         </Link>
         <button
           type="button"
           aria-controls="navbar-menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((open) => !open)}
-          className="rounded-full border border-slate-700 bg-slate-900/90 px-4 py-2 text-sm font-semibold text-slate-100 transition hover:border-orange-400 sm:hidden"
+          className="menu-trigger sm:hidden"
         >
           {menuOpen ? 'Close' : 'Menu'}
         </button>
         <div
           id="navbar-menu"
-          className={`${menuOpen ? 'flex' : 'hidden'} w-full flex-col gap-2 text-sm text-slate-200 sm:flex sm:w-auto sm:flex-row sm:items-center`}
+          className={`${menuOpen ? 'flex' : 'hidden'} nav-cluster w-full flex-col gap-2 text-sm sm:flex sm:w-auto sm:flex-row`}
         >
-          <Link to="/dashboard" onClick={closeMenu} className="rounded-full px-4 py-2 transition hover:bg-slate-800">
-            Dashboard
-          </Link>
-          <Link to="/activities" onClick={closeMenu} className="rounded-full px-4 py-2 transition hover:bg-slate-800">
-            Activities
-          </Link>
-          <Link to="/recommendations" onClick={closeMenu} className="rounded-full px-4 py-2 transition hover:bg-slate-800">
-            Recommendations
-          </Link>
-          <Link to="/strava-connect" onClick={closeMenu} className="rounded-full px-4 py-2 transition hover:bg-slate-800">
-            Strava
-          </Link>
+          <span className="nav-user-pill">
+            <span className="icon-shell icon-shell-soft">
+              <ActivityIcon size={16} />
+            </span>
+            {displayName}
+          </span>
+          {navigationItems.map(({ icon: Icon, label, to }) => (
+            <NavLink
+              key={to}
+              className={({ isActive }) => `nav-link-pill ${isActive ? 'is-active' : ''}`}
+              onClick={closeMenu}
+              to={to}
+            >
+              <Icon size={16} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+          {canInstall && (
+            <button
+              className="btn-secondary"
+              onClick={() => {
+                closeMenu();
+                onInstall();
+              }}
+              type="button"
+            >
+              <InstallIcon size={16} />
+              <span>Install app</span>
+            </button>
+          )}
+          <ThemeToggleButton compact={false} />
           <button
             onClick={() => {
               closeMenu();
               handleLogout();
             }}
-            className="rounded-full bg-orange-400 px-4 py-2 font-semibold text-slate-950 transition hover:bg-orange-300"
+            className="btn-primary"
           >
             Logout
           </button>

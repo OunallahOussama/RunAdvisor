@@ -10,7 +10,7 @@ A full-stack MEARN (MongoDB, Express, React, Node.js with Vector Search) applica
 - 🔍 **Vector Search**: Find similar activities using machine learning similarity algorithms
 - 📊 **Activity Analytics**: Track distance, pace, elevation, heart rate, and more
 - 🎯 **Training Plans**: Receive tailored training recommendations for different goals
-- 🔐 **User Authentication**: Secure registration and login
+- 🔐 **Auth0 Authentication**: Universal Login with email/password plus Google, Facebook, and other social providers
 - 📱 **Responsive UI**: Beautiful React frontend with real-time updates
 - 🐳 **Docker Support**: Easy local deployment with Docker Compose
 
@@ -20,7 +20,7 @@ A full-stack MEARN (MongoDB, Express, React, Node.js with Vector Search) applica
 - **Node.js** 18.x
 - **Express.js** - REST API framework
 - **MongoDB** 7.0 - NoSQL database with vector search
-- **JWT** - Authentication
+- **Auth0** - Access tokens and social identity federation
 - **Axios** - HTTP client for Strava API
 - **ML libraries** - Vector similarity calculations
 
@@ -85,15 +85,28 @@ RunAdvisor/
    - Go to https://www.strava.com/settings/api
    - Create an app and note your Client ID and Secret
 
-2. **Get OpenAI API Key (optional for AI recommendations):**
+2. **Create your Auth0 tenant and API:**
+   - Create a Single Page Application for the React frontend
+   - Create an API and set its identifier as `AUTH0_AUDIENCE`
+   - Add `http://localhost:3000` to Allowed Callback URLs, Allowed Logout URLs, and Allowed Web Origins
+   - Enable Google, Facebook, or other providers under Auth0 social connections
+
+3. **Get OpenAI API Key (optional for AI recommendations):**
    - Visit https://platform.openai.com/api-keys
 
-3. **Create `.env` file in project root:**
+4. **Create `.env` file in project root:**
    ```bash
+   AUTH0_DOMAIN=your-tenant.us.auth0.com
+   AUTH0_CLIENT_ID=your_auth0_spa_client_id
+   AUTH0_AUDIENCE=https://runadvisor-api
+   REACT_APP_AUTH0_CALLBACK_URL=http://localhost:3000
    STRAVA_CLIENT_ID=your_strava_client_id
    STRAVA_CLIENT_SECRET=your_strava_client_secret
+   STRAVA_REDIRECT_URI=http://localhost:3000/callback
    OPENAI_API_KEY=your_openai_api_key
    ```
+
+   The Auth0 callback URL must exactly match your Auth0 application settings, and the Strava redirect URI must exactly match your Strava app settings. If you change them, rebuild the frontend container with `docker-compose up --build`.
 
 ### Running with Docker
 
@@ -133,8 +146,7 @@ npm start
 ## API Documentation
 
 ### Authentication
-- `POST /api/auth/register` - Register new user
-- `POST /api/auth/login` - Login user
+- `POST /api/auth/sync` - Sync the Auth0 user profile into MongoDB
 - `GET /api/auth/me` - Get current user profile
 - `PUT /api/auth/preferences` - Update user preferences
 
@@ -186,7 +198,7 @@ The AI generates recommendations based on:
 ## Database Schema
 
 ### User
-- email, password (hashed)
+- auth0UserId, email, name, picture
 - name, age, experience level
 - Strava tokens and athlete ID
 - Training goals and preferences

@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
+let accessTokenGetter = null;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -9,13 +10,21 @@ const api = axios.create({
   }
 });
 
-// Add token to requests
+export const setAccessTokenGetter = (getter) => {
+  accessTokenGetter = getter;
+};
+
+// Add Auth0 access token to requests
 api.interceptors.request.use(
-  config => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  async (config) => {
+    if (accessTokenGetter) {
+      const token = await accessTokenGetter();
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
+
     return config;
   },
   error => Promise.reject(error)
@@ -23,8 +32,7 @@ api.interceptors.request.use(
 
 // Auth endpoints
 export const authApi = {
-  register: (email, password, name) => api.post('/auth/register', { email, password, name }),
-  login: (email, password) => api.post('/auth/login', { email, password }),
+  syncProfile: (profile) => api.post('/auth/sync', profile),
   getProfile: () => api.get('/auth/me'),
   updatePreferences: (preferences) => api.put('/auth/preferences', preferences)
 };
@@ -40,15 +48,24 @@ export const activitiesApi = {
 
 // Strava endpoints
 export const stravaApi = {
-  authenticate: (code, userId) => api.post('/strava/authenticate', { code, userId }),
+  authenticate: (code, redirectUri) => api.post('/strava/authenticate', { code, redirectUri }),
   getStravaActivities: (limit = 10) => api.get('/strava/activities', { params: { limit } }),
-  syncActivity: (activityId) => api.post(`/strava/sync-activity/${activityId}`)
+  syncRecentActivities: (limit = 20) => api.post('/strava/sync-recent', { limit }),
+  syncActivity: (activityId) => api.post(`/strava/sync-activity/${activityId}`),
+  getTrainingPlans: () => api.get('/strava/training-plans'),
+  getTrainingPlan: (planId) => api.get(`/strava/training-plans/${planId}`),
+  uploadTrainingPlan: (payload) => api.post('/strava/training-plans', payload),
+  deleteTrainingPlan: (planId) => api.delete(`/strava/training-plans/${planId}`)
 };
 
 // Recommendations endpoints
 export const recommendationsApi = {
   getRecommendations: ({ days = 7, raceDistance, raceDate, raceName } = {}) =>
     api.get('/recommendations', {
+      params: { days, raceDistance, raceDate, raceName }
+    }),
+  getCoachReview: ({ days = 28, raceDistance, raceDate, raceName } = {}) =>
+    api.get('/recommendations/coach-review', {
       params: { days, raceDistance, raceDate, raceName }
     }),
   getSimilarActivities: (activityId, limit = 5) => api.post('/recommendations/similar', { activityId, limit }),

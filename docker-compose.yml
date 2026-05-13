@@ -25,17 +25,17 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    env_file:
+      - .env
     container_name: runadvisor-backend
     ports:
       - "5000:5000"
     environment:
       NODE_ENV: development
+      # Local-only workaround for TLS interception / untrusted issuer certificates on this machine.
+      NODE_TLS_REJECT_UNAUTHORIZED: "0"
       MONGODB_URI: ${MONGODB_URI:-mongodb://admin:password@mongodb:27017/runadvisor?authSource=admin}
-      JWT_SECRET: your_jwt_secret_key_change_in_production
-      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
-      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET}
-      STRAVA_REDIRECT_URI: http://localhost:3000/callback
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI:-http://localhost:3000/callback}
       PORT: 5000
     networks:
       - runadvisor-network
@@ -51,15 +51,25 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_BASE_URL: http://localhost:5000/api
+        REACT_APP_AUTH0_DOMAIN: ${REACT_APP_AUTH0_DOMAIN}
+        REACT_APP_AUTH0_CLIENT_ID: ${REACT_APP_AUTH0_CLIENT_ID}
+        REACT_APP_AUTH0_AUDIENCE: ${REACT_APP_AUTH0_AUDIENCE}
+        REACT_APP_AUTH0_CALLBACK_URL: ${REACT_APP_AUTH0_CALLBACK_URL:-http://localhost:3000}
         REACT_APP_STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
-        REACT_APP_STRAVA_REDIRECT_URI: http://localhost:3000/callback
+        REACT_APP_STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI:-http://localhost:3000/callback}
+    env_file:
+      - .env
     container_name: runadvisor-frontend
     ports:
       - "3000:3000"
     environment:
       REACT_APP_API_BASE_URL: http://localhost:5000/api
+      REACT_APP_AUTH0_DOMAIN: ${REACT_APP_AUTH0_DOMAIN}
+      REACT_APP_AUTH0_CLIENT_ID: ${REACT_APP_AUTH0_CLIENT_ID}
+      REACT_APP_AUTH0_AUDIENCE: ${REACT_APP_AUTH0_AUDIENCE}
+      REACT_APP_AUTH0_CALLBACK_URL: ${REACT_APP_AUTH0_CALLBACK_URL:-http://localhost:3000}
       REACT_APP_STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
-      REACT_APP_STRAVA_REDIRECT_URI: http://localhost:3000/callback
+      REACT_APP_STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI:-http://localhost:3000/callback}
     depends_on:
       - backend
     networks:

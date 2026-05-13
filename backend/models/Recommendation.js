@@ -20,6 +20,12 @@ const recommendationSchema = new mongoose.Schema({
   // AI-generated insights
   reasoning: String,
   priority: { type: String, enum: ['low', 'medium', 'high'] },
+  confidence: { type: String, enum: ['low', 'medium', 'high'] },
+  focusArea: String,
+  timeHorizon: String,
+  whyNow: String,
+  watchOut: String,
+  actionItems: [String],
   
   // Metrics
   recommendedDistance: Number, // km

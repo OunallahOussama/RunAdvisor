@@ -11,6 +11,7 @@ describe('buildRecommendations', () => {
     const recommendations = buildRecommendations('user1', recentActivities, {}, {});
     expect(recommendations.some((rec) => rec.type === 'recovery')).toBe(true);
     expect(recommendations.some((rec) => rec.type === 'training_plan')).toBe(true);
+    expect(recommendations.every((rec) => Array.isArray(rec.actionItems))).toBe(true);
   });
 
   it('creates race-specific recommendations when race context is provided', () => {
@@ -22,5 +23,6 @@ describe('buildRecommendations', () => {
 
     expect(recommendations.some((rec) => rec.title.includes('Race'))).toBe(true);
     expect(recommendations.some((rec) => rec.reasoning.includes('race'))).toBe(true);
+    expect(recommendations.some((rec) => rec.timeHorizon)).toBe(true);
   });
 });

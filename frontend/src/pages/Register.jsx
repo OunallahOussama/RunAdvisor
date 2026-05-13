@@ -1,100 +1,52 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { authApi } from '../services/api';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import ThemeToggleButton from '../components/ThemeToggleButton';
+import { CoachIcon, RecoveryIcon, RunAdvisorMark, TargetIcon } from '../components/icons';
 import '../styles/Auth.css';
 
-function Register({ onLogin }) {
-  const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
-  });
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await authApi.register(
-        formData.email,
-        formData.password,
-        formData.name
-      );
-      onLogin(response.data.token);
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
+function Register({ onGoogleSignup }) {
   return (
     <div className="auth-container">
+      <div className="auth-toolbar">
+        <ThemeToggleButton compact />
+      </div>
       <div className="auth-box">
-        <h1>🏃 RunAdvisor</h1>
-        <h2>Register</h2>
-        
-        {error && <div className="error-message">{error}</div>}
-        
-        <form onSubmit={handleSubmit}>
-          <input
-            type="text"
-            name="name"
-            placeholder="Full Name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="email"
-            name="email"
-            placeholder="Email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-          />
-          <input
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            onChange={handleChange}
-            required
-          />
-          <button type="submit" disabled={loading}>
-            {loading ? 'Registering...' : 'Register'}
+        <div className="auth-brand">
+          <span className="brand-mark" aria-hidden="true">
+            <RunAdvisorMark size={26} />
+          </span>
+          <h1>RunAdvisor</h1>
+        </div>
+        <h2>Create your account</h2>
+        <p className="auth-copy">
+          Create your RunAdvisor account with Google.
+        </p>
+
+        <div className="auth-feature-list">
+          <div className="auth-feature">
+            <TargetIcon size={16} />
+            <span>Plan the next race from day one</span>
+          </div>
+          <div className="auth-feature">
+            <CoachIcon size={16} />
+            <span>Turn raw runs into clear coaching notes</span>
+          </div>
+          <div className="auth-feature">
+            <RecoveryIcon size={16} />
+            <span>Keep activity detail available on mobile</span>
+          </div>
+        </div>
+
+        <div className="auth-actions">
+          <button type="button" className="secondary-auth-button" onClick={onGoogleSignup}>
+            Sign up with Google
           </button>
-        </form>
+        </div>
 
         <p className="auth-link">
-          Already have an account? <a href="/login">Login here</a>
+          Already have an account?
+          {' '}
+          <Link to="/login">Sign in here</Link>
         </p>
       </div>
     </div>

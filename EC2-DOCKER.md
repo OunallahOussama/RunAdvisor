@@ -52,6 +52,14 @@ cp .env.ec2.example .env.ec2
 # edit .env.ec2 with production values
 ```
 
+For Auth0, make sure your Auth0 application allows:
+
+- Callback URL: `http://YOUR_EC2_PUBLIC_IP`
+- Logout URL: `http://YOUR_EC2_PUBLIC_IP`
+- Web Origin: `http://YOUR_EC2_PUBLIC_IP`
+
+If you later put Nginx behind a real domain and HTTPS, switch those Auth0 URLs to your final public origin.
+
 Use `--env-file` on every compose command:
 
 ```bash

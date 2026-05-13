@@ -27,7 +27,10 @@ cp .env.example .env
    ```
    STRAVA_CLIENT_ID=your_id_here
    STRAVA_CLIENT_SECRET=your_secret_here
+   STRAVA_REDIRECT_URI=http://localhost:3000/callback
    ```
+
+   Make sure this callback URL exactly matches your Strava app settings. If you change it from the default, rebuild the frontend image with `docker-compose up --build`.
 
 ### Step 4: Start the Application
 ```bash
