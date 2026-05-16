@@ -21,9 +21,13 @@ fi
 echo "Pulling latest code..."
 git pull origin main
 
-echo "Building and starting stack..."
+echo "Ensuring swap (helps small instances)..."
+bash scripts/ec2-add-swap.sh 2>/dev/null || true
+
+echo "Building and starting stack (frontend build may take 10+ minutes on t3.micro)..."
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0
+"${COMPOSE[@]}" --env-file .env.ec2 -f docker-compose.ec2.yml build backend
 "${COMPOSE[@]}" --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build
 
 echo ""

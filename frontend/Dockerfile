@@ -1,6 +1,11 @@
-FROM node:18-alpine as builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Smaller, faster production build (helps t3.micro EC2 builds finish)
+ENV CI=true
+ENV GENERATE_SOURCEMAP=false
+ENV NODE_OPTIONS=--max-old-space-size=1536
 
 ARG REACT_APP_API_BASE_URL
 ARG REACT_APP_AUTH0_DOMAIN
@@ -26,7 +31,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
