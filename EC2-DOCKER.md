@@ -65,12 +65,15 @@ cp .env.ec2.example .env.ec2
 nano .env.ec2
 ```
 
-For Auth0, allow your public origin:
+For Auth0 (Application → Settings), add **every** URL users may use (http and https until certbot is done):
 
-- Callback URL: `https://runadvisor.fit`
-- Logout URL: `https://runadvisor.fit`
-- Web Origin: `https://runadvisor.fit`
-- (Optional) same three for `https://www.runadvisor.fit` if you use www
+- Allowed Callback URLs: `http://runadvisor.fit`, `https://runadvisor.fit`, `http://www.runadvisor.fit`, `https://www.runadvisor.fit`, `http://localhost:3000`
+- Allowed Logout URLs: same list
+- Allowed Web Origins: same list
+
+Auth0 Dashboard → APIs → your API (`https://runadvisor-api`) → enable the SPA application.
+
+Auth0 Dashboard → Applications → SPA → Settings → Application Type must be **Single Page Application**.
 
 Strava: Authorization Callback Domain `runadvisor.fit`, redirect URI `https://runadvisor.fit/callback`.
 

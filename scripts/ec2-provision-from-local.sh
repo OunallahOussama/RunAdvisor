@@ -56,6 +56,31 @@ if [[ -f .env ]]; then
   if ! grep -q '^REACT_APP_STRAVA_REDIRECT_URI=' /tmp/runadvisor.env.ec2; then
     echo "REACT_APP_STRAVA_REDIRECT_URI=${PUBLIC_BASE_URL}/callback" >> /tmp/runadvisor.env.ec2
   fi
+  # Docker Compose does not expand ${VAR} inside .env files — set explicit React Auth0 vars.
+  auth_domain=$(grep '^AUTH0_DOMAIN=' /tmp/runadvisor.env.ec2 | cut -d= -f2-)
+  auth_client=$(grep '^AUTH0_CLIENT_ID=' /tmp/runadvisor.env.ec2 | cut -d= -f2-)
+  auth_audience=$(grep '^AUTH0_AUDIENCE=' /tmp/runadvisor.env.ec2 | cut -d= -f2-)
+  if [[ -n "$auth_domain" ]]; then
+    if grep -q '^REACT_APP_AUTH0_DOMAIN=' /tmp/runadvisor.env.ec2; then
+      sed -i "s|^REACT_APP_AUTH0_DOMAIN=.*|REACT_APP_AUTH0_DOMAIN=${auth_domain}|" /tmp/runadvisor.env.ec2
+    else
+      echo "REACT_APP_AUTH0_DOMAIN=${auth_domain}" >> /tmp/runadvisor.env.ec2
+    fi
+  fi
+  if [[ -n "$auth_client" ]]; then
+    if grep -q '^REACT_APP_AUTH0_CLIENT_ID=' /tmp/runadvisor.env.ec2; then
+      sed -i "s|^REACT_APP_AUTH0_CLIENT_ID=.*|REACT_APP_AUTH0_CLIENT_ID=${auth_client}|" /tmp/runadvisor.env.ec2
+    else
+      echo "REACT_APP_AUTH0_CLIENT_ID=${auth_client}" >> /tmp/runadvisor.env.ec2
+    fi
+  fi
+  if [[ -n "$auth_audience" ]]; then
+    if grep -q '^REACT_APP_AUTH0_AUDIENCE=' /tmp/runadvisor.env.ec2; then
+      sed -i "s|^REACT_APP_AUTH0_AUDIENCE=.*|REACT_APP_AUTH0_AUDIENCE=${auth_audience}|" /tmp/runadvisor.env.ec2
+    else
+      echo "REACT_APP_AUTH0_AUDIENCE=${auth_audience}" >> /tmp/runadvisor.env.ec2
+    fi
+  fi
   if ! grep -q '^MONGO_INITDB_ROOT_USERNAME=' /tmp/runadvisor.env.ec2; then
     cat >> /tmp/runadvisor.env.ec2 <<'EOF'
 

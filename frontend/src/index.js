@@ -22,7 +22,11 @@ captureStravaOAuthFromUrl();
 const auth0Domain = process.env.REACT_APP_AUTH0_DOMAIN;
 const auth0ClientId = process.env.REACT_APP_AUTH0_CLIENT_ID;
 const auth0Audience = process.env.REACT_APP_AUTH0_AUDIENCE;
-const auth0CallbackUrl = process.env.REACT_APP_AUTH0_CALLBACK_URL || window.location.origin;
+// Use the live browser origin so http/https and www/non-www match Auth0 allowed URLs.
+const auth0CallbackUrl =
+  typeof window !== 'undefined'
+    ? window.location.origin
+    : (process.env.REACT_APP_AUTH0_CALLBACK_URL || 'http://localhost:3000');
 const missingAuth0Config = !auth0Domain || !auth0ClientId || !auth0Audience;
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
