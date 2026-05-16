@@ -4,6 +4,12 @@
   "private": true,
   "dependencies": {
     "@auth0/auth0-react": "^2.16.2",
+    "@emotion/react": "^11.13.0",
+    "@emotion/styled": "^11.13.0",
+    "@fontsource/roboto": "^5.0.8",
+    "@mapbox/polyline": "^1.2.1",
+    "@mui/icons-material": "^5.16.0",
+    "@mui/material": "^5.16.0",
     "axios": "^1.6.0",
     "chart.js": "^4.4.0",
     "date-fns": "^2.30.0",

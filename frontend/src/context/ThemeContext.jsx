@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import CssBaseline from '@mui/material/CssBaseline';
+import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
+import { createAppTheme } from '../theme/muiAppTheme';
 
 const THEME_STORAGE_KEY = 'runadvisor-theme';
 const ThemeContext = createContext(null);
@@ -63,7 +66,16 @@ export function ThemeProvider({ children }) {
     toggleTheme: () => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
   }), [theme]);
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  const muiTheme = useMemo(() => createAppTheme(theme), [theme]);
+
+  return (
+    <ThemeContext.Provider value={value}>
+      <MuiThemeProvider theme={muiTheme}>
+        <CssBaseline />
+        {children}
+      </MuiThemeProvider>
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000/api';
 let accessTokenGetter = null;
+let accessTokenRefresher = null;
+let apiNotifier = null;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,7 +16,25 @@ export const setAccessTokenGetter = (getter) => {
   accessTokenGetter = getter;
 };
 
-// Add Auth0 access token to requests
+export const setAccessTokenRefresher = (refresher) => {
+  accessTokenRefresher = refresher;
+};
+
+export const setApiNotifier = (notifier) => {
+  apiNotifier = notifier;
+};
+
+function formatRateLimitMessage(error) {
+  const retryAfter = error.response?.headers?.['retry-after'] || error.response?.data?.retryAfter;
+  const base = error.response?.data?.message || 'Too many requests. Please slow down and try again.';
+
+  if (retryAfter) {
+    return `${base} Retry after ${retryAfter} seconds.`;
+  }
+
+  return base;
+}
+
 api.interceptors.request.use(
   async (config) => {
     if (accessTokenGetter) {
@@ -28,6 +48,43 @@ api.interceptors.request.use(
     return config;
   },
   error => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  response => response,
+  async (error) => {
+    const { config, response } = error;
+
+    if (!response) {
+      apiNotifier?.('Network error. Check your connection and try again.', 'warning');
+      return Promise.reject(error);
+    }
+
+    if (response.status === 429) {
+      apiNotifier?.(formatRateLimitMessage(error), 'warning');
+      return Promise.reject(error);
+    }
+
+    if (response.status === 401 && config && !config._retry && accessTokenRefresher) {
+      config._retry = true;
+
+      try {
+        await accessTokenRefresher();
+        return api(config);
+      } catch (refreshError) {
+        apiNotifier?.('Your session expired. Please sign in again.', 'error');
+        return Promise.reject(refreshError);
+      }
+    }
+
+    if (response.status >= 500 && config && !config._serverRetried) {
+      config._serverRetried = true;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return api(config);
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 // Auth endpoints
@@ -51,7 +108,8 @@ export const stravaApi = {
   authenticate: (code, redirectUri) => api.post('/strava/authenticate', { code, redirectUri }),
   getStravaActivities: (limit = 10) => api.get('/strava/activities', { params: { limit } }),
   syncRecentActivities: (limit = 20) => api.post('/strava/sync-recent', { limit }),
-  syncActivity: (activityId) => api.post(`/strava/sync-activity/${activityId}`),
+  getStravaActivityDetail: (identifier) =>
+    api.get(`/strava/activities/${encodeURIComponent(identifier)}/detail`),
   getTrainingPlans: () => api.get('/strava/training-plans'),
   getTrainingPlan: (planId) => api.get(`/strava/training-plans/${planId}`),
   uploadTrainingPlan: (payload) => api.post('/strava/training-plans', payload),

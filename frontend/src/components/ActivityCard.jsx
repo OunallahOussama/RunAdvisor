@@ -1,4 +1,13 @@
 import React, { useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Collapse from '@mui/material/Collapse';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import {
   ActivityIcon,
   CalendarIcon,
@@ -59,91 +68,154 @@ function ActivityCard({ activity, onDelete }) {
   const recoveryCue = getRecoveryCue(activity);
 
   return (
-    <div className="section-card break-words transition hover:-translate-y-0.5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3">
-          <span className="icon-shell" aria-hidden="true">
-            <ActivityTypeIcon size={18} />
-          </span>
-          <div>
-            <h3 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{activity.name}</h3>
-            <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>{activity.type} • {date}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="card-tag">{activity.type?.toUpperCase()}</span>
-          <span className="detail-badge detail-badge-accent">{effortLabel}</span>
-        </div>
-      </div>
+    <Card variant="outlined" sx={{ wordBreak: 'break-word' }}>
+      <CardContent>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+          <Stack direction="row" spacing={1.5} alignItems="flex-start">
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'primary.main',
+                color: 'primary.contrastText',
+                flexShrink: 0
+              }}
+            >
+              <ActivityTypeIcon size={18} />
+            </Box>
+            <Box>
+              <Typography variant="h6" component="h3">
+                {activity.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {activity.type} • {date}
+              </Typography>
+            </Box>
+          </Stack>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Chip label={activity.type?.toUpperCase()} size="small" variant="outlined" />
+            <Chip color="primary" label={effortLabel} size="small" variant="filled" />
+          </Stack>
+        </Stack>
 
-      <div className="mt-5 activity-metric-grid">
-        <div className="activity-metric">
-          <p className="activity-metric-label"><DistanceIcon size={14} /> Distance</p>
-          <p className="activity-metric-value">{distance} km</p>
-        </div>
-        <div className="activity-metric">
-          <p className="activity-metric-label"><ClockIcon size={14} /> Duration</p>
-          <p className="activity-metric-value">{duration} mins</p>
-        </div>
-        <div className="activity-metric">
-          <p className="activity-metric-label"><PaceIcon size={14} /> Pace</p>
-          <p className="activity-metric-value">{activity.pace?.toFixed(1) ?? 'N/A'} min/km</p>
-        </div>
-        <div className="activity-metric">
-          <p className="activity-metric-label"><CalendarIcon size={14} /> Date</p>
-          <p className="activity-metric-value">{date}</p>
-        </div>
-        {activity.elevationGain > 0 && (
-          <div className="activity-metric">
-            <p className="activity-metric-label"><ElevationIcon size={14} /> Elevation</p>
-            <p className="activity-metric-value">{activity.elevationGain} m</p>
-          </div>
-        )}
-        {activity.avgHeartRate && (
-          <div className="activity-metric">
-            <p className="activity-metric-label"><HeartIcon size={14} /> Avg HR</p>
-            <p className="activity-metric-value">{activity.avgHeartRate} bpm</p>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <button
-          onClick={() => setExpanded((prev) => !prev)}
-          className="btn-secondary"
-          type="button"
+        <Box
+          sx={{
+            mt: 2,
+            display: 'grid',
+            gap: 1,
+            gridTemplateColumns: { xs: '1fr 1fr', sm: 'repeat(auto-fit, minmax(120px, 1fr))' }
+          }}
         >
-          {expanded ? 'Hide details' : 'View details'}
-        </button>
-        <button
-          onClick={() => onDelete(activity._id)}
-          className="btn-danger"
-          type="button"
-        >
-          Delete
-        </button>
-      </div>
+          <MetricBox icon={DistanceIcon} label="Distance" value={`${distance} km`} />
+          <MetricBox icon={ClockIcon} label="Duration" value={`${duration} mins`} />
+          <MetricBox icon={PaceIcon} label="Pace" value={activity.pace != null ? `${activity.pace.toFixed(1)} min/km` : 'N/A'} />
+          <MetricBox icon={CalendarIcon} label="Date" value={date} />
+          {activity.elevationGain > 0 && (
+            <MetricBox icon={ElevationIcon} label="Elevation" value={`${activity.elevationGain} m`} />
+          )}
+          {activity.avgHeartRate && (
+            <MetricBox icon={HeartIcon} label="Avg HR" value={`${activity.avgHeartRate} bpm`} />
+          )}
+        </Box>
 
-      {expanded && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="note-box">
-            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Activity details</p>
-            <p className="mt-2 text-sm leading-6">{activity.notes || 'No extra notes for this activity.'}</p>
-          </div>
-          <div className="coach-callout">
-            <div className="flex items-start gap-3">
-              <span className="icon-shell icon-shell-soft">
-                <RecoveryIcon size={16} />
-              </span>
-              <div>
-                <p className="m-0 font-medium" style={{ color: 'var(--text-primary)' }}>Recovery cue</p>
-                <p className="mt-2 text-sm leading-6">{recoveryCue}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
+          <Button component={RouterLink} to={`/activities/${activity._id}`} variant="contained" type="button">
+            Open full page
+          </Button>
+          <Button variant="outlined" onClick={() => setExpanded((prev) => !prev)} type="button">
+            {expanded ? 'Hide details' : 'View details'}
+          </Button>
+          <Button color="error" variant="outlined" onClick={() => onDelete(activity._id)} type="button">
+            Delete
+          </Button>
+        </Stack>
+
+        <Collapse in={expanded}>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={2} sx={{ mt: 2 }}>
+            <Box
+              sx={{
+                flex: 1,
+                p: 2,
+                borderRadius: 2,
+                bgcolor: 'action.hover',
+                border: 1,
+                borderColor: 'divider'
+              }}
+            >
+              <Typography fontWeight={600} gutterBottom>
+                Activity details
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {activity.notes || 'No extra notes for this activity.'}
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                width: { lg: 280 },
+                p: 2,
+                borderRadius: 2,
+                bgcolor: (t) => (t.palette.mode === 'dark' ? 'rgba(251,146,60,0.12)' : 'rgba(230,81,0,0.08)'),
+                border: 1,
+                borderColor: 'primary.dark'
+              }}
+            >
+              <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <Box
+                  sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'action.selected',
+                    flexShrink: 0
+                  }}
+                >
+                  <RecoveryIcon size={16} />
+                </Box>
+                <Box>
+                  <Typography fontWeight={600} gutterBottom>
+                    Recovery cue
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {recoveryCue}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MetricBox({ icon: Icon, label, value }) {
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: 2,
+        border: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.default'
+      }}
+    >
+      <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.5 }}>
+        <Icon size={14} />
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.06 }}>
+          {label}
+        </Typography>
+      </Stack>
+      <Typography variant="body1" fontWeight={700}>
+        {value}
+      </Typography>
+    </Box>
   );
 }
 

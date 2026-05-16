@@ -1,5 +1,61 @@
+const STRAVA_OAUTH_CODE_KEY = 'runadvisor.strava.oauth.code';
+const STRAVA_OAUTH_REDIRECT_KEY = 'runadvisor.strava.oauth.redirectUri';
+
 export function getStravaRedirectUri() {
   return process.env.REACT_APP_STRAVA_REDIRECT_URI || `${window.location.origin}/callback`;
+}
+
+/**
+ * Persist Strava OAuth params as early as possible (before React routing / login redirects).
+ */
+export function captureStravaOAuthFromUrl() {
+  if (typeof window === 'undefined' || window.location.pathname !== '/callback') {
+    return;
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+
+  if (!code) {
+    return;
+  }
+
+  sessionStorage.setItem(STRAVA_OAUTH_CODE_KEY, code);
+  sessionStorage.setItem(STRAVA_OAUTH_REDIRECT_KEY, getStravaRedirectUri());
+}
+
+export function readStravaOAuthCode(search) {
+  const params = new URLSearchParams(search || '');
+  const fromUrl = params.get('code');
+
+  if (fromUrl) {
+    sessionStorage.setItem(STRAVA_OAUTH_CODE_KEY, fromUrl);
+    sessionStorage.setItem(STRAVA_OAUTH_REDIRECT_KEY, getStravaRedirectUri());
+    return fromUrl;
+  }
+
+  try {
+    return sessionStorage.getItem(STRAVA_OAUTH_CODE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function readStravaOAuthRedirectUri() {
+  try {
+    return sessionStorage.getItem(STRAVA_OAUTH_REDIRECT_KEY) || getStravaRedirectUri();
+  } catch {
+    return getStravaRedirectUri();
+  }
+}
+
+export function clearStravaOAuthSession() {
+  try {
+    sessionStorage.removeItem(STRAVA_OAUTH_CODE_KEY);
+    sessionStorage.removeItem(STRAVA_OAUTH_REDIRECT_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 function formatProviderErrors(errors) {

@@ -1,30 +1,50 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import Container from '@mui/material/Container';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Activities from './pages/Activities';
+import ActivityDetail from './pages/ActivityDetail';
 import Recommendations from './pages/Recommendations';
 import StravaConnect from './pages/StravaConnect';
 import StravaCallback from './pages/StravaCallback';
 import Navbar from './components/Navbar';
 import { OfflineIcon } from './components/icons';
-import { authApi, setAccessTokenGetter } from './services/api';
+import { authApi, setAccessTokenGetter, setAccessTokenRefresher, setApiNotifier } from './services/api';
+import { ApiNotificationProvider, useApiNotification } from './context/ApiNotificationContext';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import './App.css';
 
 function LoadingScreen({ message }) {
   return (
-    <div className="app-shell flex min-h-screen items-center justify-center px-6">
-      <div className="section-card max-w-md px-8 py-6 text-center">
-        <p className="text-lg font-semibold text-[color:var(--text-primary)]">{message}</p>
-      </div>
-    </div>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        px: 2
+      }}
+    >
+      <Paper elevation={3} sx={{ maxWidth: 420, width: 1, py: 4, px: 3, textAlign: 'center' }}>
+        <CircularProgress color="primary" sx={{ mb: 2 }} />
+        <Typography variant="body1" fontWeight={600}>
+          {message}
+        </Typography>
+      </Paper>
+    </Box>
   );
 }
 
-function App() {
+function AppContent() {
   const {
     error,
     getAccessTokenSilently,
@@ -34,12 +54,21 @@ function App() {
     logout,
     user
   } = useAuth0();
+  const { showNotification } = useApiNotification();
   const [profileError, setProfileError] = useState('');
   const [profileSyncing, setProfileSyncing] = useState(false);
   const [authError, setAuthError] = useState('');
   const [isOnline, setIsOnline] = useState(window.navigator.onLine);
   const syncedAuth0UserRef = useRef('');
   const { canInstall, promptToInstall } = usePwaInstallPrompt();
+
+  useEffect(() => {
+    setApiNotifier(showNotification);
+
+    return () => {
+      setApiNotifier(null);
+    };
+  }, [showNotification]);
 
   useEffect(() => {
     setAccessTokenGetter(async () => {
@@ -50,8 +79,17 @@ function App() {
       return getAccessTokenSilently();
     });
 
+    setAccessTokenRefresher(async () => {
+      if (!isAuthenticated) {
+        return null;
+      }
+
+      return getAccessTokenSilently({ cacheMode: 'off' });
+    });
+
     return () => {
       setAccessTokenGetter(null);
+      setAccessTokenRefresher(null);
     };
   }, [getAccessTokenSilently, isAuthenticated]);
 
@@ -88,9 +126,9 @@ function App() {
         if (isMounted) {
           syncedAuth0UserRef.current = user.sub;
         }
-      } catch (error) {
+      } catch (err) {
         if (isMounted) {
-          setProfileError(error.response?.data?.error || 'Failed to sync your profile.');
+          setProfileError(err.response?.data?.error || 'Failed to sync your profile.');
         }
       } finally {
         if (isMounted) {
@@ -151,7 +189,7 @@ function App() {
 
   return (
     <Router>
-      <div className="App app-shell">
+      <Box className="App" sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {isAuthenticated && (
           <Navbar
             canInstall={canInstall}
@@ -160,80 +198,57 @@ function App() {
             user={user}
           />
         )}
-        {!isOnline && (
-          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-            <div className="page-banner page-banner-warning flex items-center gap-3">
-              <OfflineIcon size={18} />
-              <span>Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when available.</span>
-            </div>
-          </div>
-        )}
-        {profileError && (
-          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-            <div className="page-banner page-banner-danger text-sm">
-              {profileError}
-            </div>
-          </div>
-        )}
-        {authError && (
-          <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6 lg:px-8">
-            <div className="page-banner page-banner-warning text-sm">
-              Sign-in error: {authError}
-            </div>
-          </div>
-        )}
-        <Routes>
-          <Route 
-            path="/login" 
-            element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" />
-              ) : (
-                <Login
-                  onGoogleLogin={() => loginWithRedirect()}
-                />
-              )
-            }
-          />
-          <Route 
-            path="/register" 
-            element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" />
-              ) : (
-                <Register
-                  onGoogleSignup={() => loginWithRedirect()}
-                />
-              )
-            }
-          />
-          <Route 
-            path="/dashboard" 
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/activities" 
-            element={isAuthenticated ? <Activities /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/recommendations" 
-            element={isAuthenticated ? <Recommendations /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/strava-connect" 
-            element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/callback" 
-            element={isAuthenticated ? <StravaCallback /> : <Navigate to="/login" />} 
-          />
-          <Route 
-            path="/" 
-            element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} />} 
-          />
-        </Routes>
-      </div>
+        <Container maxWidth="lg" sx={{ pt: isAuthenticated ? 2 : 0, pb: 4, flex: 1 }}>
+          <Stack spacing={2} sx={{ mb: 2 }}>
+            {!isOnline && (
+              <Alert icon={<OfflineIcon size={20} />} severity="warning">
+                Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when
+                available.
+              </Alert>
+            )}
+            {profileError && <Alert severity="error">{profileError}</Alert>}
+            {authError && <Alert severity="warning">Sign-in error: {authError}</Alert>}
+          </Stack>
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                isAuthenticated ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Login onGoogleLogin={() => loginWithRedirect()} />
+                )
+              }
+            />
+            <Route
+              path="/register"
+              element={
+                isAuthenticated ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Register onGoogleSignup={() => loginWithRedirect()} />
+                )
+              }
+            />
+            <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/activities/:id" element={isAuthenticated ? <ActivityDetail /> : <Navigate to="/login" />} />
+            <Route path="/activities" element={isAuthenticated ? <Activities /> : <Navigate to="/login" />} />
+            <Route path="/recommendations" element={isAuthenticated ? <Recommendations /> : <Navigate to="/login" />} />
+            <Route path="/strava-connect" element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} />
+            <Route path="/callback" element={<StravaCallback />} />
+            <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
+          </Routes>
+        </Container>
+      </Box>
     </Router>
+  );
+}
+
+function App() {
+  return (
+    <ApiNotificationProvider>
+      <AppContent />
+    </ApiNotificationProvider>
   );
 }
 

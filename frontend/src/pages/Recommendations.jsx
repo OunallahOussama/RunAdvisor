@@ -1,5 +1,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import MenuItem from '@mui/material/MenuItem';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import TrainingTrendChart from '../components/TrainingTrendChart';
+import TrainingMetricsCharts from '../components/TrainingMetricsCharts';
 import {
   ActivityIcon,
   BoltIcon,
@@ -61,18 +77,80 @@ function getRecommendationIcon(rec) {
   return CoachIcon;
 }
 
-function getReadinessTone(readiness = '') {
+function getReadinessChipColor(readiness = '') {
   const normalized = readiness.toLowerCase();
 
   if (normalized.includes('ready') || normalized.includes('strong')) {
-    return 'status-pill-success';
+    return 'success';
   }
 
   if (normalized.includes('caution') || normalized.includes('watch')) {
-    return 'status-pill-warning';
+    return 'warning';
   }
 
-  return '';
+  return undefined;
+}
+
+function MetricStat({ icon: Icon, label, value, emphasize }) {
+  return (
+    <Card variant="outlined" sx={{ bgcolor: emphasize ? 'action.hover' : 'background.paper' }}>
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {label}
+            </Typography>
+            <Typography variant="h5" fontWeight={700} sx={{ mt: 0.5 }}>
+              {value}
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText'
+            }}
+          >
+            <Icon size={18} />
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InsightPanel({ title, items, empty, icon: Icon }) {
+  const list = Array.isArray(items) ? items : [];
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+        <Icon size={18} />
+        <Typography fontWeight={600}>{title}</Typography>
+      </Stack>
+      <List dense disablePadding>
+        {list.length === 0 ? (
+          <ListItem disableGutters>
+            <ListItemText primary={empty} primaryTypographyProps={{ variant: 'body2', color: 'text.secondary' }} />
+          </ListItem>
+        ) : (
+          list.map((item) => (
+            <ListItem key={item} disableGutters sx={{ alignItems: 'flex-start' }}>
+              <ListItemIcon sx={{ minWidth: 32, mt: 0.25 }}>
+                <Icon size={16} />
+              </ListItemIcon>
+              <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2' }} />
+            </ListItem>
+          ))
+        )}
+      </List>
+    </Paper>
+  );
 }
 
 function Recommendations() {
@@ -88,6 +166,10 @@ function Recommendations() {
   const [message, setMessage] = useState('');
   const [reviewMessage, setReviewMessage] = useState('');
   const [offlineMessage, setOfflineMessage] = useState('');
+  const [racePacePrediction, setRacePacePrediction] = useState(null);
+  const [lastWeekSummary, setLastWeekSummary] = useState(null);
+  const [dailyMetrics, setDailyMetrics] = useState([]);
+  const [weeklyRacePaceProjection, setWeeklyRacePaceProjection] = useState([]);
 
   const raceDays = raceDate ? Math.max(0, Math.ceil((new Date(raceDate) - Date.now()) / (24 * 60 * 60 * 1000))) : null;
 
@@ -126,24 +208,36 @@ function Recommendations() {
         setCoachReview(coachReviewData.coachReview || null);
         setSummary(coachReviewData.summary || null);
         setTrend(coachReviewData.trend || []);
+        setRacePacePrediction(coachReviewData.racePacePrediction || null);
+        setLastWeekSummary(coachReviewData.lastWeekSummary || null);
+        setDailyMetrics(coachReviewData.dailyMetrics || []);
+        setWeeklyRacePaceProjection(coachReviewData.weeklyRacePaceProjection || []);
         setReviewMessage(coachReviewData.message || 'Coach review ready.');
       } else {
         console.error('Error fetching coach review:', coachReviewResult.reason);
         setCoachReview(null);
         setSummary(null);
         setTrend([]);
+        setRacePacePrediction(null);
+        setLastWeekSummary(null);
+        setDailyMetrics([]);
+        setWeeklyRacePaceProjection([]);
         setReviewMessage('Unable to load your coach review right now.');
       }
 
       if (recommendationData || coachReviewData) {
         saveSnapshot(RECOMMENDATIONS_CACHE_KEY, {
           coachReview: coachReviewData?.coachReview || null,
+          dailyMetrics: coachReviewData?.dailyMetrics || [],
+          lastWeekSummary: coachReviewData?.lastWeekSummary || null,
           message: recommendationData?.message || 'Your recommendations are ready.',
+          racePacePrediction: coachReviewData?.racePacePrediction || null,
           recommendations: recommendationData?.recommendations || [],
           request,
           reviewMessage: coachReviewData?.message || 'Coach review ready.',
           summary: coachReviewData?.summary || null,
-          trend: coachReviewData?.trend || []
+          trend: coachReviewData?.trend || [],
+          weeklyRacePaceProjection: coachReviewData?.weeklyRacePaceProjection || []
         });
         setOfflineMessage('');
       } else {
@@ -154,6 +248,10 @@ function Recommendations() {
           setCoachReview(cachedInsights.data.coachReview || null);
           setSummary(cachedInsights.data.summary || null);
           setTrend(cachedInsights.data.trend || []);
+          setRacePacePrediction(cachedInsights.data.racePacePrediction || null);
+          setLastWeekSummary(cachedInsights.data.lastWeekSummary || null);
+          setDailyMetrics(cachedInsights.data.dailyMetrics || []);
+          setWeeklyRacePaceProjection(cachedInsights.data.weeklyRacePaceProjection || []);
           setMessage(cachedInsights.data.message || 'Showing your last saved recommendations.');
           setReviewMessage(cachedInsights.data.reviewMessage || 'Showing your last saved coach review.');
           setOfflineMessage(`Using your saved coach review from ${formatSnapshotTimestamp(cachedInsights.savedAt)}.`);
@@ -192,378 +290,523 @@ function Recommendations() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-      <section className="section-card mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="eyebrow">Coach workspace</p>
-            <h1 className="section-heading">Coach Review & Recommendations</h1>
-            <p className="section-subtitle">A recent-training review that turns your Strava sync and manual logs into trend-aware coaching guidance.</p>
-          </div>
-          <div className="metric-panel max-w-xs">
-            <p className="metric-title">Review window</p>
-            <select
-              value={days}
+    <Box component="main">
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} justifyContent="space-between" alignItems={{ sm: 'flex-start' }}>
+            <Box>
+              <Typography variant="overline" color="primary" fontWeight={700}>
+                Coach workspace
+              </Typography>
+              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+                Coach Review & Recommendations
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640 }}>
+                A recent-training review that turns your Strava sync and manual logs into trend-aware coaching guidance.
+              </Typography>
+            </Box>
+            <TextField
+              label="Review window"
               onChange={(event) => setDays(parseInt(event.target.value, 10))}
-              className="select-shell mt-3"
+              select
+              sx={{ minWidth: 180 }}
+              value={days}
             >
-              <option value={14}>Last 14 days</option>
-              <option value={28}>Last 28 days</option>
-              <option value={42}>Last 42 days</option>
-            </select>
-          </div>
-        </div>
-      </section>
+              <MenuItem value={14}>Last 14 days</MenuItem>
+              <MenuItem value={28}>Last 28 days</MenuItem>
+              <MenuItem value={42}>Last 42 days</MenuItem>
+            </TextField>
+          </Stack>
+        </CardContent>
+      </Card>
 
       {offlineMessage && (
-        <section className="mb-8">
-          <div className="page-banner">{offlineMessage}</div>
-        </section>
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">{offlineMessage}</Alert>
+        </Box>
       )}
 
-      <section className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
-        <div className="section-card">
-          <div className="flex items-center gap-3">
-            <span className="icon-shell">
-              <TargetIcon size={18} />
-            </span>
-            <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Next race details</h2>
-          </div>
-          <form onSubmit={handleRaceSubmit} className="mt-5 grid gap-4">
-            <label className="field-label">
-              <span>Next race name</span>
-              <input
-                value={raceName}
-                onChange={(e) => setRaceName(e.target.value)}
-                placeholder="City Marathon, 10K, Trail Race"
-                className="input-shell"
-              />
-            </label>
-            <label className="field-label">
-              <span>Race distance (km)</span>
-              <input
-                type="number"
-                min="1"
-                value={raceDistance}
-                onChange={(e) => setRaceDistance(e.target.value)}
-                className="input-shell"
-              />
-            </label>
-            <label className="field-label">
-              <span>Race date</span>
-              <input
-                type="date"
-                value={raceDate}
-                onChange={(e) => setRaceDate(e.target.value)}
-                className="input-shell"
-              />
-            </label>
-            <button type="submit" className="btn-primary w-full">
-              <TrendIcon size={16} />
-              Refresh coach review
-            </button>
-          </form>
-        </div>
+      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} sx={{ mb: 3 }} alignItems="stretch">
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText'
+                }}
+              >
+                <TargetIcon size={18} />
+              </Box>
+              <Typography variant="h5" fontWeight={600}>
+                Next race details
+              </Typography>
+            </Stack>
+            <Box component="form" onSubmit={handleRaceSubmit}>
+              <Stack spacing={2}>
+                <TextField
+                  fullWidth
+                  label="Next race name"
+                  onChange={(e) => setRaceName(e.target.value)}
+                  placeholder="City Marathon, 10K, Trail Race"
+                  value={raceName}
+                />
+                <TextField
+                  fullWidth
+                  label="Race distance (km)"
+                  inputProps={{ min: 1 }}
+                  onChange={(e) => setRaceDistance(e.target.value)}
+                  type="number"
+                  value={raceDistance}
+                />
+                <TextField
+                  fullWidth
+                  InputLabelProps={{ shrink: true }}
+                  label="Race date"
+                  onChange={(e) => setRaceDate(e.target.value)}
+                  type="date"
+                  value={raceDate}
+                />
+                <Button startIcon={<TrendIcon size={16} />} type="submit" variant="contained">
+                  Refresh coach review
+                </Button>
+              </Stack>
+            </Box>
+          </CardContent>
+        </Card>
 
-        <div className="section-card sticky top-6">
-          <div className="flex items-center gap-3">
-            <span className="icon-shell icon-shell-soft">
-              <CalendarIcon size={18} />
-            </span>
-            <h3 className="m-0 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Race readiness</h3>
-          </div>
-          <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Use the same race inputs for both the coach review and the action plan below.</p>
-          <div className="mt-6 grid gap-3">
-            <div className="metric-panel">
-              <p className="metric-title">Race distance</p>
-              <p className="metric-emphasis">{raceDistance} km</p>
-            </div>
-            <div className="metric-panel">
-              <p className="metric-title">Days until race</p>
-              <p className="metric-emphasis">{raceDays ?? 'TBA'}</p>
-            </div>
-            <div className="metric-panel">
-              <p className="metric-title">Coach mode</p>
-              <p className="metric-emphasis">{coachReview ? capitalizeLabel(coachReview.readiness) : 'Pending'}</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <Card variant="outlined" sx={{ width: { xl: 320 }, flexShrink: 0, position: { xl: 'sticky' }, top: { xl: 16 } }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'action.selected'
+                }}
+              >
+                <CalendarIcon size={18} />
+              </Box>
+              <Typography variant="h6" fontWeight={600}>
+                Race readiness
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Use the same race inputs for both the coach review and the action plan below.
+            </Typography>
+            <Stack spacing={2}>
+              <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
+                <CardContent>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Race distance
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                    {raceDistance} km
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
+                <CardContent>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Days until race
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                    {raceDays ?? 'TBA'}
+                  </Typography>
+                </CardContent>
+              </Card>
+              <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
+                <CardContent>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                    Coach mode
+                  </Typography>
+                  <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                    {coachReview ? capitalizeLabel(coachReview.readiness) : 'Pending'}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
 
-      <section className="mb-8 grid gap-6">
-        <div className="section-card">
-          <p className="eyebrow">Recommendations status</p>
-          <p className="m-0 text-lg" style={{ color: 'var(--text-primary)' }}>{message}</p>
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>{reviewMessage}</p>
-        </div>
+      <Stack spacing={3}>
+        <Card variant="outlined">
+          <CardContent>
+            <Typography variant="overline" color="primary" fontWeight={700}>
+              Recommendations status
+            </Typography>
+            <Typography variant="h6" sx={{ mt: 1 }}>
+              {message}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {reviewMessage}
+            </Typography>
+          </CardContent>
+        </Card>
 
         {loading ? (
-          <div className="section-card">
-            <p className="empty-state">Generating coach review...</p>
-          </div>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography color="text.secondary">Generating coach review...</Typography>
+            </CardContent>
+          </Card>
         ) : (
           <>
             {summary ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="stats-card">
-                  <div className="stats-card-header">
-                    <div>
-                      <p className="stats-label">Total distance</p>
-                      <p className="stats-value">{summary.totalDistanceKm.toFixed(1)} km</p>
-                    </div>
-                    <span className="icon-shell"><DistanceIcon size={18} /></span>
-                  </div>
-                </div>
-                <div className="stats-card">
-                  <div className="stats-card-header">
-                    <div>
-                      <p className="stats-label">Active days</p>
-                      <p className="stats-value">{summary.activeDays}</p>
-                    </div>
-                    <span className="icon-shell icon-shell-soft"><ActivityIcon size={18} /></span>
-                  </div>
-                </div>
-                <div className="stats-card">
-                  <div className="stats-card-header">
-                    <div>
-                      <p className="stats-label">Average pace</p>
-                      <p className="stats-value">{formatPace(summary.avgPace)}</p>
-                    </div>
-                    <span className="icon-shell"><PaceIcon size={18} /></span>
-                  </div>
-                </div>
-                <div className="stats-card">
-                  <div className="stats-card-header">
-                    <div>
-                      <p className="stats-label">Longest run</p>
-                      <p className="stats-value">{summary.longestRunKm.toFixed(1)} km</p>
-                    </div>
-                    <span className="icon-shell icon-shell-soft"><BoltIcon size={18} /></span>
-                  </div>
-                </div>
-              </div>
+              <>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)', xl: 'repeat(4, 1fr)' }
+                  }}
+                >
+                  <MetricStat icon={DistanceIcon} label="Total distance" value={`${summary.totalDistanceKm.toFixed(1)} km`} emphasize />
+                  <MetricStat icon={ActivityIcon} label="Active days" value={summary.activeDays} />
+                  <MetricStat icon={PaceIcon} label="Average pace" value={formatPace(summary.avgPace)} emphasize />
+                  <MetricStat icon={BoltIcon} label="Longest run" value={`${summary.longestRunKm.toFixed(1)} km`} />
+                </Box>
+
+                <Stack spacing={2} sx={{ mt: 2 }}>
+                  {lastWeekSummary && lastWeekSummary.activityCount > 0 && (
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Typography variant="overline" color="text.secondary">
+                          Last 7 days (runs)
+                        </Typography>
+                        <Box
+                          sx={{
+                            display: 'grid',
+                            gap: 2,
+                            mt: 1,
+                            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }
+                          }}
+                        >
+                          <MetricStat icon={DistanceIcon} label="Distance" value={`${Number(lastWeekSummary.totalDistanceKm).toFixed(1)} km`} />
+                          <MetricStat icon={ActivityIcon} label="Runs" value={lastWeekSummary.activityCount} />
+                          <MetricStat icon={PaceIcon} label="Avg pace" value={formatPace(lastWeekSummary.avgPace)} />
+                          <MetricStat icon={BoltIcon} label="Longest" value={`${Number(lastWeekSummary.longestRunKm).toFixed(1)} km`} />
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {racePacePrediction && (
+                    <Card variant="outlined">
+                      <CardContent>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'flex-start' }}>
+                          <Box>
+                            <Typography variant="overline" color="text.secondary">
+                              Race pace outlook
+                            </Typography>
+                            {racePacePrediction.predictedPaceMinPerKm ? (
+                              <>
+                                <Typography variant="h4" fontWeight={600} sx={{ mt: 0.5 }}>
+                                  ~{formatPace(racePacePrediction.predictedPaceMinPerKm)}
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                                  Finish about {racePacePrediction.predictedFinishTimeLabel || '—'} at{' '}
+                                  {racePacePrediction.raceDistanceKm} km, based on the past week of training.
+                                </Typography>
+                              </>
+                            ) : (
+                              <Typography variant="body1" sx={{ mt: 1 }}>
+                                {racePacePrediction.explanation || 'Set a race distance to see a pace outlook.'}
+                              </Typography>
+                            )}
+                          </Box>
+                          {racePacePrediction.predictedPaceMinPerKm && racePacePrediction.confidence && (
+                            <Chip label={capitalizeLabel(racePacePrediction.confidence)} size="small" variant="outlined" />
+                          )}
+                        </Stack>
+                        {racePacePrediction.predictedPaceMinPerKm && racePacePrediction.explanation && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                            {racePacePrediction.explanation}
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <TrainingMetricsCharts
+                    dailyMetrics={dailyMetrics}
+                    trend={trend}
+                    weeklyRacePaceProjection={weeklyRacePaceProjection}
+                  />
+                </Stack>
+              </>
             ) : (
-              <div className="section-card">
-                <p className="empty-state">No recent activities are available for coach review yet. Sync Strava or add manual logs first.</p>
-              </div>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography color="text.secondary">
+                    No recent activities are available for coach review yet. Sync Strava or add manual logs first.
+                  </Typography>
+                </CardContent>
+              </Card>
             )}
 
             {(coachReview || trend.length > 0) && (
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-                <div className="section-card">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <span className="icon-shell">
-                          <CoachIcon size={18} />
-                        </span>
-                        <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Coach review</h2>
-                      </div>
-                      <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>{coachReview?.headline || 'Recent training review unavailable.'}</p>
-                    </div>
-                    {coachReview && (
-                      <span className={`status-pill ${getReadinessTone(coachReview.readiness)}`.trim()}>
-                        {capitalizeLabel(coachReview.readiness)}
-                      </span>
+              <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} alignItems="stretch">
+                <Card variant="outlined" sx={{ flex: 1 }}>
+                  <CardContent>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'flex-start' }}>
+                      <Box>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Box
+                            sx={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 2,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              bgcolor: 'primary.main',
+                              color: 'primary.contrastText'
+                            }}
+                          >
+                            <CoachIcon size={18} />
+                          </Box>
+                          <Typography variant="h5" fontWeight={600}>
+                            Coach review
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                          {coachReview?.headline || 'Recent training review unavailable.'}
+                        </Typography>
+                      </Box>
+                      {coachReview && (
+                        <Chip
+                          {...(getReadinessChipColor(coachReview.readiness)
+                            ? { color: getReadinessChipColor(coachReview.readiness) }
+                            : {})}
+                          label={capitalizeLabel(coachReview.readiness)}
+                          size="small"
+                        />
+                      )}
+                    </Stack>
+
+                    <Stack spacing={2} sx={{ mt: 3 }}>
+                      <InsightPanel
+                        icon={CheckIcon}
+                        items={coachReview?.positives}
+                        title="What is going well"
+                        empty="More data is needed before the coach can call out strong positives."
+                      />
+                      <InsightPanel
+                        icon={WarningIcon}
+                        items={coachReview?.risks}
+                        title="Watchouts"
+                        empty="Nothing major stands out right now."
+                      />
+                      <InsightPanel
+                        icon={TargetIcon}
+                        items={coachReview?.nextFocus}
+                        title="Next focus"
+                        empty="No next-step focus has been generated yet."
+                      />
+                    </Stack>
+                  </CardContent>
+                </Card>
+
+                <Card variant="outlined" sx={{ flex: 1 }}>
+                  <CardContent>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+                      <Box>
+                        <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Box
+                            sx={{
+                              width: 44,
+                              height: 44,
+                              borderRadius: 2,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              bgcolor: 'primary.main',
+                              color: 'primary.contrastText'
+                            }}
+                          >
+                            <TrendIcon size={18} />
+                          </Box>
+                          <Typography variant="h5" fontWeight={600}>
+                            Recent training trends
+                          </Typography>
+                        </Stack>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                          Distance and pace over the past several weeks.
+                        </Typography>
+                      </Box>
+                      {summary && summary.weeklyDistanceDeltaPct != null && (
+                        <Chip
+                          icon={<DistanceIcon size={14} />}
+                          label={`Weekly distance change: ${summary.weeklyDistanceDeltaPct}%`}
+                          variant="outlined"
+                        />
+                      )}
+                    </Stack>
+
+                    {trend.length > 0 ? (
+                      <Box sx={{ mt: 3, height: 288 }}>
+                        <TrainingTrendChart trend={trend} />
+                      </Box>
+                    ) : (
+                      <Typography color="text.secondary" sx={{ mt: 3 }}>
+                        No trend data available yet.
+                      </Typography>
                     )}
-                  </div>
-
-                  <div className="mt-6 grid gap-4">
-                    <div className="note-box">
-                      <div className="flex items-center gap-3">
-                        <span className="icon-shell icon-shell-success">
-                          <CheckIcon size={16} />
-                        </span>
-                        <p className="m-0 font-semibold" style={{ color: 'var(--text-primary)' }}>What is going well</p>
-                      </div>
-                      <ul className="coach-list mt-4">
-                        {(coachReview?.positives || []).length === 0 ? (
-                          <li className="coach-list-item">More data is needed before the coach can call out strong positives.</li>
-                        ) : (
-                          coachReview.positives.map((item) => (
-                            <li key={item} className="coach-list-item">
-                              <CheckIcon size={16} />
-                              <span>{item}</span>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    </div>
-
-                    <div className="note-box">
-                      <div className="flex items-center gap-3">
-                        <span className="icon-shell icon-shell-warning">
-                          <WarningIcon size={16} />
-                        </span>
-                        <p className="m-0 font-semibold" style={{ color: 'var(--text-primary)' }}>Watchouts</p>
-                      </div>
-                      <ul className="coach-list mt-4">
-                        {(coachReview?.risks || []).length === 0 ? (
-                          <li className="coach-list-item">Nothing major stands out right now.</li>
-                        ) : (
-                          coachReview.risks.map((item) => (
-                            <li key={item} className="coach-list-item">
-                              <WarningIcon size={16} />
-                              <span>{item}</span>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    </div>
-
-                    <div className="note-box">
-                      <div className="flex items-center gap-3">
-                        <span className="icon-shell icon-shell-soft">
-                          <TargetIcon size={16} />
-                        </span>
-                        <p className="m-0 font-semibold" style={{ color: 'var(--text-primary)' }}>Next focus</p>
-                      </div>
-                      <ul className="coach-list mt-4">
-                        {(coachReview?.nextFocus || []).length === 0 ? (
-                          <li className="coach-list-item">No next-step focus has been generated yet.</li>
-                        ) : (
-                          coachReview.nextFocus.map((item) => (
-                            <li key={item} className="coach-list-item">
-                              <TargetIcon size={16} />
-                              <span>{item}</span>
-                            </li>
-                          ))
-                        )}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="section-card">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <span className="icon-shell">
-                          <TrendIcon size={18} />
-                        </span>
-                        <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Recent training trends</h2>
-                      </div>
-                      <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Distance and pace over the past several weeks.</p>
-                    </div>
-                    {summary && summary.weeklyDistanceDeltaPct != null && (
-                      <div className="detail-badge">
-                        <DistanceIcon size={14} />
-                        Weekly distance change: <span style={{ color: 'var(--text-primary)' }}>{summary.weeklyDistanceDeltaPct}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {trend.length > 0 ? (
-                    <div className="mt-6">
-                      <TrainingTrendChart trend={trend} />
-                    </div>
-                  ) : (
-                    <p className="mt-6 empty-state">No trend data available yet.</p>
-                  )}
-                </div>
-              </div>
+                  </CardContent>
+                </Card>
+              </Stack>
             )}
 
             {recommendations.length === 0 ? (
-              <div className="section-card">
-                <p className="empty-state">No recommendations available yet. Add more activities to get personalized recommendations.</p>
-              </div>
+              <Card variant="outlined">
+                <CardContent>
+                  <Typography color="text.secondary">
+                    No recommendations available yet. Add more activities to get personalized recommendations.
+                  </Typography>
+                </CardContent>
+              </Card>
             ) : (
-              <div className="grid gap-5">
+              <Stack spacing={2}>
                 {recommendations.map((rec, index) => {
                   const recommendationId = rec._id || rec.id;
                   const RecommendationIcon = getRecommendationIcon(rec);
 
                   return (
-                    <div key={recommendationId || index} className="section-card">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex items-start gap-3">
-                          <span className="icon-shell">
-                            <RecommendationIcon size={18} />
-                          </span>
-                          <div>
-                            <h3 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>{rec.title}</h3>
-                            <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>{rec.description}</p>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="detail-badge">{rec.type}</span>
-                          {rec.priority && <span className="detail-badge detail-badge-accent">Priority: {rec.priority}</span>}
-                          {rec.confidence && <span className="detail-badge">Confidence: {rec.confidence}</span>}
-                        </div>
-                      </div>
+                    <Card key={recommendationId || index} variant="outlined">
+                      <CardContent>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'flex-start' }}>
+                          <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                            <Box
+                              sx={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 2,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                bgcolor: 'primary.main',
+                                color: 'primary.contrastText',
+                                flexShrink: 0
+                              }}
+                            >
+                              <RecommendationIcon size={18} />
+                            </Box>
+                            <Box>
+                              <Typography variant="h6">{rec.title}</Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                {rec.description}
+                              </Typography>
+                            </Box>
+                          </Stack>
+                          <Stack direction="row" flexWrap="wrap" gap={1}>
+                            {rec.type && <Chip label={rec.type} size="small" variant="outlined" />}
+                            {rec.priority && <Chip color="primary" label={`Priority: ${rec.priority}`} size="small" />}
+                            {rec.confidence && <Chip label={`Confidence: ${rec.confidence}`} size="small" variant="outlined" />}
+                          </Stack>
+                        </Stack>
 
-                      {rec.reasoning && <p className="mt-4" style={{ color: 'var(--text-secondary)' }}>Coach note: {rec.reasoning}</p>}
-                      {rec.whyNow && <p className="mt-3 text-sm" style={{ color: 'var(--text-tertiary)' }}>Why now: {rec.whyNow}</p>}
+                        {rec.reasoning && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                            Coach note: {rec.reasoning}
+                          </Typography>
+                        )}
+                        {rec.whyNow && (
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                            Why now: {rec.whyNow}
+                          </Typography>
+                        )}
 
-                      <div className="mt-5 flex flex-wrap gap-3 text-sm">
-                        {rec.focusArea && <span className="detail-badge"><CoachIcon size={14} /> Focus: {capitalizeLabel(rec.focusArea)}</span>}
-                        {rec.timeHorizon && <span className="detail-badge"><CalendarIcon size={14} /> Window: {rec.timeHorizon}</span>}
-                        {rec.recommendedType && <span className="detail-badge"><ActivityIcon size={14} /> Session: {rec.recommendedType}</span>}
-                        {rec.recommendedDistance && <span className="detail-badge"><DistanceIcon size={14} /> Distance: {formatDistance(rec.recommendedDistance)}</span>}
-                        {rec.recommendedPace && <span className="detail-badge"><PaceIcon size={14} /> Pace: {formatPace(rec.recommendedPace)}</span>}
-                        {rec.recommendedDuration && <span className="detail-badge"><ClockIcon size={14} /> Duration: {formatDuration(rec.recommendedDuration)}</span>}
-                      </div>
+                        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 2 }}>
+                          {rec.focusArea && (
+                            <Chip icon={<CoachIcon size={14} />} label={`Focus: ${capitalizeLabel(rec.focusArea)}`} size="small" variant="outlined" />
+                          )}
+                          {rec.timeHorizon && (
+                            <Chip icon={<CalendarIcon size={14} />} label={`Window: ${rec.timeHorizon}`} size="small" variant="outlined" />
+                          )}
+                          {rec.recommendedType && (
+                            <Chip icon={<ActivityIcon size={14} />} label={`Session: ${rec.recommendedType}`} size="small" variant="outlined" />
+                          )}
+                          {rec.recommendedDistance && (
+                            <Chip icon={<DistanceIcon size={14} />} label={`Distance: ${formatDistance(rec.recommendedDistance)}`} size="small" variant="outlined" />
+                          )}
+                          {rec.recommendedPace && (
+                            <Chip icon={<PaceIcon size={14} />} label={`Pace: ${formatPace(rec.recommendedPace)}`} size="small" variant="outlined" />
+                          )}
+                          {rec.recommendedDuration && (
+                            <Chip icon={<ClockIcon size={14} />} label={`Duration: ${formatDuration(rec.recommendedDuration)}`} size="small" variant="outlined" />
+                          )}
+                        </Stack>
 
-                      {(rec.actionItems || []).length > 0 && (
-                        <div className="mt-5 note-box">
-                          <div className="flex items-center gap-3">
-                            <span className="icon-shell icon-shell-success">
+                        {(rec.actionItems || []).length > 0 && (
+                          <Paper variant="outlined" sx={{ mt: 2, p: 2, bgcolor: 'action.hover' }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
                               <CheckIcon size={16} />
-                            </span>
-                            <p className="m-0 font-semibold" style={{ color: 'var(--text-primary)' }}>Action steps</p>
-                          </div>
-                          <ul className="coach-list mt-4">
-                            {rec.actionItems.map((item) => (
-                              <li key={item} className="coach-list-item">
-                                <CheckIcon size={16} />
-                                <span>{item}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                              <Typography fontWeight={600}>Action steps</Typography>
+                            </Stack>
+                            <List dense disablePadding>
+                              {rec.actionItems.map((item) => (
+                                <ListItem key={item} disableGutters sx={{ alignItems: 'flex-start' }}>
+                                  <ListItemIcon sx={{ minWidth: 32, mt: 0.25 }}>
+                                    <CheckIcon size={16} />
+                                  </ListItemIcon>
+                                  <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2' }} />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </Paper>
+                        )}
 
-                      {rec.watchOut && (
-                        <div className="mt-4 page-banner page-banner-warning">
-                          <div className="flex items-start gap-3">
-                            <WarningIcon size={16} />
-                            <span>Watch out: {rec.watchOut}</span>
-                          </div>
-                        </div>
-                      )}
+                        {rec.watchOut && (
+                          <Alert severity="warning" sx={{ mt: 2 }}>
+                            Watch out: {rec.watchOut}
+                          </Alert>
+                        )}
 
-                      {recommendationId ? (
-                        <div className="button-row mt-6">
-                          <button
-                            onClick={() => handleRecommendationFeedback(recommendationId, 'accepted')}
-                            className="btn-primary"
-                            type="button"
-                          >
-                            <CheckIcon size={16} />
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => handleRecommendationFeedback(recommendationId, 'rejected')}
-                            className="btn-secondary"
-                            type="button"
-                          >
-                            <WarningIcon size={16} />
-                            Reject
-                          </button>
-                        </div>
-                      ) : (
-                        <p className="mt-4 text-sm" style={{ color: 'var(--text-tertiary)' }}>Recommendation ID unavailable.</p>
-                      )}
-                    </div>
+                        {recommendationId ? (
+                          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mt: 2 }}>
+                            <Button
+                              startIcon={<CheckIcon size={16} />}
+                              variant="contained"
+                              onClick={() => handleRecommendationFeedback(recommendationId, 'accepted')}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              color="inherit"
+                              startIcon={<WarningIcon size={16} />}
+                              variant="outlined"
+                              onClick={() => handleRecommendationFeedback(recommendationId, 'rejected')}
+                            >
+                              Reject
+                            </Button>
+                          </Stack>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 2 }} display="block">
+                            Recommendation ID unavailable.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
                   );
                 })}
-              </div>
+              </Stack>
             )}
           </>
         )}
-      </section>
-    </main>
+      </Stack>
+    </Box>
   );
 }
 

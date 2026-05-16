@@ -131,7 +131,10 @@ function buildWeeklyTrend(activities = [], weeks = 6) {
       longestRunKm: 0,
       activityCount: 0,
       paceSum: 0,
-      paceCount: 0
+      paceCount: 0,
+      hrSum: 0,
+      hrCount: 0,
+      elevationM: 0
     };
 
     bucketMap.set(key, bucket);
@@ -161,6 +164,13 @@ function buildWeeklyTrend(activities = [], weeks = 6) {
       bucket.paceSum += activity.pace;
       bucket.paceCount += 1;
     }
+
+    if (Number.isFinite(activity.avgHeartRate)) {
+      bucket.hrSum += activity.avgHeartRate;
+      bucket.hrCount += 1;
+    }
+
+    bucket.elevationM += Number(activity.elevationGain || 0);
   });
 
   return buckets.map((bucket) => ({
@@ -169,14 +179,252 @@ function buildWeeklyTrend(activities = [], weeks = 6) {
     totalDurationMinutes: round(bucket.totalDurationMinutes),
     avgPace: bucket.paceCount ? round(bucket.paceSum / bucket.paceCount) : null,
     longestRunKm: round(bucket.longestRunKm),
-    activityCount: bucket.activityCount
+    activityCount: bucket.activityCount,
+    avgHeartRate: bucket.hrCount ? round(bucket.hrSum / bucket.hrCount) : null,
+    totalElevationM: round(bucket.elevationM, 0)
   }));
+}
+
+function filterActivitiesSinceMs(activities = [], sinceMs) {
+  return activities.filter((activity) => {
+    const date = safeDate(activity.date);
+    return date && date.getTime() >= sinceMs;
+  });
+}
+
+function buildDailyMetricsTrend(activities = [], daysBack = 28) {
+  const runActivities = activities.filter(isRunActivity);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
+  const start = new Date(end.getTime() - (daysBack - 1) * DAY_MS);
+  start.setHours(0, 0, 0, 0);
+  const map = new Map();
+
+  for (let t = start.getTime(); t <= end.getTime(); t += DAY_MS) {
+    const d = new Date(t);
+    const key = d.toISOString().slice(0, 10);
+    map.set(key, {
+      date: key,
+      label: `${d.getMonth() + 1}/${d.getDate()}`,
+      distanceKm: 0,
+      movingMinutes: 0,
+      elevationM: 0,
+      paceSum: 0,
+      paceCount: 0,
+      hrSum: 0,
+      hrCount: 0,
+      activityCount: 0
+    });
+  }
+
+  runActivities.forEach((activity) => {
+    const day = safeDate(activity.date);
+    if (!day) {
+      return;
+    }
+
+    const key = day.toISOString().slice(0, 10);
+
+    if (!map.has(key)) {
+      return;
+    }
+
+    const row = map.get(key);
+    row.distanceKm += Number(activity.distance || 0) / 1000;
+    row.movingMinutes += Number(activity.movingTime || activity.duration || 0) / 60;
+    row.elevationM += Number(activity.elevationGain || 0);
+
+    if (Number.isFinite(activity.pace)) {
+      row.paceSum += activity.pace;
+      row.paceCount += 1;
+    }
+
+    if (Number.isFinite(activity.avgHeartRate)) {
+      row.hrSum += activity.avgHeartRate;
+      row.hrCount += 1;
+    }
+
+    row.activityCount += 1;
+  });
+
+  return Array.from(map.values()).map((row) => ({
+    date: row.date,
+    label: row.label,
+    distanceKm: round(row.distanceKm, 2),
+    movingMinutes: round(row.movingMinutes, 1),
+    elevationM: round(row.elevationM, 0),
+    avgPace: row.paceCount ? round(row.paceSum / row.paceCount, 2) : null,
+    avgHeartRate: row.hrCount ? round(row.hrSum / row.hrCount) : null,
+    activityCount: row.activityCount
+  }));
+}
+
+const RIEGEL_EXPONENT = 1.06;
+
+function formatRaceFinishClock(totalMinutes) {
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+    return null;
+  }
+
+  const totalSeconds = Math.round(totalMinutes * 60);
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function buildRacePacePrediction(lastWeekActivities = [], raceDistanceKm) {
+  const base = {
+    raceDistanceKm,
+    predictedPaceMinPerKm: null,
+    predictedFinishTimeMinutes: null,
+    predictedFinishTimeLabel: null,
+    method: 'insufficient_data',
+    confidence: 'low',
+    explanation: '',
+    referenceRun: null
+  };
+
+  if (!raceDistanceKm || raceDistanceKm <= 0) {
+    base.explanation = 'Set a race distance to see a pace outlook grounded in last week\'s training.';
+    return base;
+  }
+
+  const runs = lastWeekActivities.filter(isRunActivity);
+
+  if (runs.length === 0) {
+    base.explanation = 'Log at least one run in the last 7 days to unlock a last-week-based race pace outlook.';
+    return base;
+  }
+
+  let ref = null;
+
+  runs.forEach((a) => {
+    const dk = Number(a.distance || 0) / 1000;
+    const pace = a.pace;
+
+    if (dk < 3 || !Number.isFinite(pace)) {
+      return;
+    }
+
+    if (!ref || dk > ref.distanceKm) {
+      const movingMin = Number(a.movingTime || a.duration || 0) / 60;
+      ref = {
+        distanceKm: round(dk, 2),
+        durationMinutes: round(movingMin, 1),
+        paceMinPerKm: pace,
+        date: a.date
+      };
+    }
+  });
+
+  if (ref && ref.distanceKm > 0.5) {
+    const T1 = ref.durationMinutes;
+    const D1 = ref.distanceKm;
+    const D2 = raceDistanceKm;
+    const ratio = D2 / D1;
+    const T2 = T1 * (ratio ** RIEGEL_EXPONENT);
+    const pace = T2 / D2;
+    let confidence = 'high';
+
+    if (ratio > 2.2) {
+      confidence = 'low';
+    } else if (ratio > 1.5) {
+      confidence = 'medium';
+    }
+
+    return {
+      ...base,
+      predictedPaceMinPerKm: round(pace, 2),
+      predictedFinishTimeMinutes: round(T2, 1),
+      predictedFinishTimeLabel: formatRaceFinishClock(T2),
+      method: 'riegel_longest_run_last_week',
+      confidence,
+      referenceRun: ref,
+      explanation: `Projected from your longest quality run last week (${ref.distanceKm} km at ~${round(ref.paceMinPerKm, 2)} min/km) using a Riegel-style curve to ${raceDistanceKm} km. Treat as a pace band, not a guarantee.`
+    };
+  }
+
+  const stats = calculateCoreStats(runs);
+
+  if (!stats.avgPace) {
+    base.explanation = 'Add pace data from GPS or manual logs to estimate race intensity.';
+    return base;
+  }
+
+  let adj = 0.05;
+
+  if (raceDistanceKm <= 10) {
+    adj = -0.35;
+  } else if (raceDistanceKm <= 21.1) {
+    adj = -0.15;
+  } else if (raceDistanceKm <= 42.2) {
+    adj = 0.05;
+  } else {
+    adj = 0.15;
+  }
+
+  const pace = Math.max(2.4, stats.avgPace + adj);
+  const T2 = pace * raceDistanceKm;
+
+  return {
+    ...base,
+    predictedPaceMinPerKm: round(pace, 2),
+    predictedFinishTimeMinutes: round(T2, 1),
+    predictedFinishTimeLabel: formatRaceFinishClock(T2),
+    method: 'weekly_avg_pace_adjusted',
+    confidence: 'medium',
+    explanation: `No long run last week met the Riegel threshold, so pace assumes your recent average rhythm (${stats.avgPace} min/km) adjusted for ${raceDistanceKm} km race specificity.`
+  };
+}
+
+function buildWeeklyRacePaceProjection(weeklyTrend = [], raceDistanceKm) {
+  if (!raceDistanceKm || raceDistanceKm <= 0) {
+    return [];
+  }
+
+  return weeklyTrend.map((week) => {
+    if (!week.avgPace) {
+      return { label: week.label, predictedPaceMinPerKm: null };
+    }
+
+    let adj = 0.05;
+
+    if (raceDistanceKm <= 10) {
+      adj = -0.35;
+    } else if (raceDistanceKm <= 21.1) {
+      adj = -0.15;
+    } else if (raceDistanceKm <= 42.2) {
+      adj = 0.05;
+    } else {
+      adj = 0.15;
+    }
+
+    return {
+      label: week.label,
+      predictedPaceMinPerKm: round(Math.max(2.4, week.avgPace + adj), 2)
+    };
+  });
 }
 
 function buildCoachReview(activities = [], user = {}, options = {}) {
   const { days = 28, raceDistance = null, raceDate = null, raceName = '' } = options;
   const summary = calculateCoreStats(activities);
   const trend = buildWeeklyTrend(activities, 6);
+  const raceDistanceKm = raceDistance != null && Number.isFinite(Number(raceDistance))
+    ? Number(raceDistance)
+    : null;
+  const lastWeekSince = Date.now() - (7 * DAY_MS);
+  const lastWeekActivities = filterActivitiesSinceMs(activities, lastWeekSince);
+  const lastWeekSummary = calculateCoreStats(lastWeekActivities);
+  const dailyMetrics = buildDailyMetricsTrend(activities, 28);
+  const racePacePrediction = buildRacePacePrediction(lastWeekActivities, raceDistanceKm);
+  const weeklyRacePaceProjection = buildWeeklyRacePaceProjection(trend, raceDistanceKm);
   const currentWeek = trend[trend.length - 1] || null;
   const previousWeek = trend[trend.length - 2] || null;
   const previousDistance = previousWeek?.totalDistanceKm || 0;
@@ -244,6 +492,10 @@ function buildCoachReview(activities = [], user = {}, options = {}) {
     }
   }
 
+  if (racePacePrediction.predictedPaceMinPerKm && raceDistanceKm) {
+    nextFocus.push(`Model check: about ${racePacePrediction.predictedPaceMinPerKm} min/km for ${raceDistanceKm} km based on last week — tune with tempo and long-run rehearsals.`);
+  }
+
   let readiness = 'build';
   let headline = 'Your recent training supports a steady build phase.';
 
@@ -275,12 +527,18 @@ function buildCoachReview(activities = [], user = {}, options = {}) {
       positives,
       risks,
       nextFocus
-    }
+    },
+    lastWeekSummary,
+    dailyMetrics,
+    racePacePrediction,
+    weeklyRacePaceProjection
   };
 }
 
 module.exports = {
   buildCoachReview,
   buildWeeklyTrend,
-  calculateCoreStats
+  calculateCoreStats,
+  buildDailyMetricsTrend,
+  buildRacePacePrediction
 };

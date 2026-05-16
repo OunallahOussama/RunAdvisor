@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
 import { activitiesApi } from '../services/api';
+import { ThemeProvider } from '../context/ThemeContext';
 
 jest.mock('../services/api', () => ({
   activitiesApi: {
@@ -15,6 +16,14 @@ jest.mock('../utils/offlineCache', () => ({
   loadSnapshot: jest.fn(() => null),
   saveSnapshot: jest.fn()
 }));
+
+function renderWithProviders(ui) {
+  return render(
+    <ThemeProvider>
+      <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>{ui}</MemoryRouter>
+    </ThemeProvider>
+  );
+}
 
 describe('Dashboard page', () => {
   beforeEach(() => {
@@ -33,11 +42,7 @@ describe('Dashboard page', () => {
   });
 
   it('renders the compact overview without the old welcome hero copy', async () => {
-    render(
-      <MemoryRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-        <Dashboard />
-      </MemoryRouter>
-    );
+    renderWithProviders(<Dashboard />);
 
     expect(await screen.findByRole('heading', { name: /Weekly training overview/i })).toBeInTheDocument();
     expect(await screen.findByText(/Weekly data loaded/i)).toBeInTheDocument();

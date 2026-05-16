@@ -42,4 +42,39 @@ describe('buildCoachReview', () => {
     expect(result.coachReview.headline).toBeTruthy();
     expect(result.coachReview.nextFocus.length).toBeGreaterThan(0);
   });
+
+  it('returns daily metrics, last-week summary, and race pace fields when race distance is set', () => {
+    const now = Date.now();
+    const dayAgo = (n) => new Date(now - n * 86400000);
+
+    const activities = [
+      {
+        type: 'run',
+        distance: 12000,
+        movingTime: 3600,
+        pace: 5,
+        avgHeartRate: 150,
+        date: dayAgo(10)
+      },
+      {
+        type: 'run',
+        distance: 21000,
+        movingTime: 7200,
+        pace: 5.7,
+        avgHeartRate: 148,
+        date: dayAgo(2)
+      }
+    ];
+
+    const result = buildCoachReview(activities, {}, {
+      days: 28,
+      raceDistance: 42.2
+    });
+
+    expect(result.dailyMetrics.length).toBe(28);
+    expect(result.lastWeekSummary.activityCount).toBeGreaterThan(0);
+    expect(result.racePacePrediction.raceDistanceKm).toBe(42.2);
+    expect(result.racePacePrediction.predictedPaceMinPerKm).toBeTruthy();
+    expect(result.weeklyRacePaceProjection.length).toBe(6);
+  });
 });

@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link as RouterLink } from 'react-router-dom';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import { activitiesApi } from '../services/api';
 import StatsCard from '../components/StatsCard';
 import {
@@ -76,50 +83,50 @@ function Dashboard() {
     }
   ];
 
-  const statCards = summary ? [
-    {
-      hint: 'Total distance recorded this week.',
-      icon: DistanceIcon,
-      title: 'Total Distance',
-      value: `${summary.totalDistance.toFixed(1)} km`
-    },
-    {
-      hint: 'Time spent moving across all sessions.',
-      icon: ClockIcon,
-      title: 'Total Time',
-      value: `${(summary.totalDuration / 60).toFixed(1)} hrs`
-    },
-    {
-      hint: 'How many sessions fueled your week.',
-      icon: ActivityIcon,
-      title: 'Activities',
-      value: summary.activityCount
-    },
-    {
-      hint: 'Average rhythm across your logged runs.',
-      icon: PaceIcon,
-      title: 'Avg Pace',
-      value: `${summary.avgPace.toFixed(1)} min/km`
-    },
-    {
-      hint: 'Climbing load across the week.',
-      icon: ElevationIcon,
-      title: 'Elevation Gain',
-      value: `${summary.totalElevation.toFixed(0)} m`
-    },
-    {
-      hint: 'Heart rate trend for aerobic control.',
-      icon: HeartIcon,
-      title: 'Avg HR',
-      value: `${summary.avgHeartRate.toFixed(0)} bpm`
-    }
-  ] : [];
+  const statCards = summary
+    ? [
+        {
+          hint: 'Total distance recorded this week.',
+          icon: DistanceIcon,
+          title: 'Total Distance',
+          value: `${summary.totalDistance.toFixed(1)} km`
+        },
+        {
+          hint: 'Time spent moving across all sessions.',
+          icon: ClockIcon,
+          title: 'Total Time',
+          value: `${(summary.totalDuration / 60).toFixed(1)} hrs`
+        },
+        {
+          hint: 'How many sessions fueled your week.',
+          icon: ActivityIcon,
+          title: 'Activities',
+          value: summary.activityCount
+        },
+        {
+          hint: 'Average rhythm across your logged runs.',
+          icon: PaceIcon,
+          title: 'Avg Pace',
+          value: `${summary.avgPace.toFixed(1)} min/km`
+        },
+        {
+          hint: 'Climbing load across the week.',
+          icon: ElevationIcon,
+          title: 'Elevation Gain',
+          value: `${summary.totalElevation.toFixed(0)} m`
+        },
+        {
+          hint: 'Heart rate trend for aerobic control.',
+          icon: HeartIcon,
+          title: 'Avg HR',
+          value: `${summary.avgHeartRate.toFixed(0)} bpm`
+        }
+      ]
+    : [];
 
   const totalHours = summary ? (summary.totalDuration / 60).toFixed(1) : null;
   const dataStatusLabel = summary ? 'Weekly data loaded' : 'Awaiting first sync';
-  const weeklyFocusTitle = summary
-    ? `${summary.activityCount} sessions logged`
-    : 'Build this week’s baseline';
+  const weeklyFocusTitle = summary ? `${summary.activityCount} sessions logged` : 'Build this week’s baseline';
   const weeklyFocusDescription = summary
     ? `You have ${summary.totalDistance.toFixed(1)} km across ${totalHours} hours this week. Review coach guidance to turn that load into pacing, recovery, and race-day decisions.`
     : 'Sync Strava or add a manual activity to unlock weekly load, pacing, and recovery guidance across the app.';
@@ -142,181 +149,279 @@ function Dashboard() {
   ];
 
   return (
-    <main className="dashboard-page mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-      <section className="dashboard-overview-shell section-card mb-8">
-        <div className="dashboard-overview-header">
-          <div className="dashboard-overview-copy">
-            <div className="dashboard-overview-meta">
-              <span className="card-tag">Dashboard</span>
-              <span className={summary ? 'status-pill status-pill-success' : 'status-pill'}>
-                <SyncIcon size={14} />
-                {dataStatusLabel}
-              </span>
-            </div>
-            <h1 className="dashboard-page-title">Weekly training overview</h1>
-            <p className="dashboard-page-subtitle">
-              Monitor weekly load, keep your training data current, and move quickly between
-              logging, syncing, and coach review.
-            </p>
-          </div>
-          <div className="dashboard-header-actions">
-            <Link to="/recommendations" className="btn-primary">
-              <CoachIcon size={18} />
-              Open coach review
-            </Link>
-            <Link to="/activities" className="btn-secondary">
-              <ActivityIcon size={18} />
-              Log activity
-            </Link>
-          </div>
-        </div>
-        <div className="dashboard-overview-grid">
-          {overviewMetrics.map((metric) => (
-            <div key={metric.label} className="dashboard-overview-metric">
-              <p className="dashboard-overview-label">{metric.label}</p>
-              <p className="dashboard-overview-value">{metric.value}</p>
-              <p className="dashboard-overview-supporting">{metric.supporting}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+    <Box component="main">
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={3}
+            justifyContent="space-between"
+            alignItems={{ md: 'flex-start' }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                <Chip label="Dashboard" size="small" variant="outlined" />
+                <Chip
+                  color={summary ? 'success' : 'default'}
+                  icon={<SyncIcon size={14} />}
+                  label={dataStatusLabel}
+                  size="small"
+                />
+              </Stack>
+              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+                Weekly training overview
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 560 }}>
+                Monitor weekly load, keep your training data current, and move quickly between logging, syncing, and coach
+                review.
+              </Typography>
+            </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Button
+                component={RouterLink}
+                startIcon={<CoachIcon size={18} />}
+                to="/recommendations"
+                variant="contained"
+              >
+                Open coach review
+              </Button>
+              <Button component={RouterLink} startIcon={<ActivityIcon size={18} />} to="/activities" variant="outlined">
+                Log activity
+              </Button>
+            </Stack>
+          </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 3 }}>
+            {overviewMetrics.map((metric) => (
+              <Card key={metric.label} variant="outlined" sx={{ flex: 1, bgcolor: 'action.hover' }}>
+                <CardContent>
+                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {metric.label}
+                  </Typography>
+                  <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>
+                    {metric.value}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    {metric.supporting}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
 
-      <section className="dashboard-focus-grid mb-8">
-        <div className="dashboard-focus-card">
-          <div className="dashboard-focus-badges">
-            <span className="detail-badge detail-badge-accent">
-              <TargetIcon size={14} />
-              Weekly focus
-            </span>
-            <span className={summary ? 'status-pill status-pill-success' : 'status-pill'}>
-              <SyncIcon size={14} />
-              {summary ? 'Current week loaded' : 'Ready for first sync'}
-            </span>
-          </div>
-          <h2 className="dashboard-focus-title">{weeklyFocusTitle}</h2>
-          <p className="dashboard-focus-copy">{weeklyFocusDescription}</p>
-          <div className="inline-list">
-            <span className="detail-badge">
-              <DistanceIcon size={14} />
-              {summary ? `${summary.totalDistance.toFixed(1)} km this week` : 'Weekly load tracking'}
-            </span>
-            <span className="detail-badge">
-              <ClockIcon size={14} />
-              {summary ? `${totalHours} hours logged` : 'Training time overview'}
-            </span>
-            <span className="detail-badge">
-              <TrendIcon size={14} />
-              Trend-aware coaching
-            </span>
-          </div>
-        </div>
-        <div className="dashboard-support-grid">
-          <Link to="/recommendations" className="dashboard-support-card">
-            <span className="icon-shell" aria-hidden="true">
-              <CoachIcon size={18} />
-            </span>
-            <div>
-              <p className="metric-title">Coach review</p>
-              <p className="dashboard-support-title">
-                {summary ? 'Review this training week' : 'Open when your data is ready'}
-              </p>
-              <p className="dashboard-support-copy">
-                Readiness, risk, and next workout guidance in one focused workflow.
-              </p>
-            </div>
-          </Link>
-          <Link to="/strava-connect" className="dashboard-support-card">
-            <span className="icon-shell" aria-hidden="true">
-              <SyncIcon size={18} />
-            </span>
-            <div>
-              <p className="metric-title">Data sync</p>
-              <p className="dashboard-support-title">Keep workouts current</p>
-              <p className="dashboard-support-copy">
-                Refresh Strava and keep your mobile activity history accurate.
-              </p>
-            </div>
-          </Link>
-          <Link to="/activities" className="dashboard-support-card">
-            <span className="icon-shell" aria-hidden="true">
-              <ActivityIcon size={18} />
-            </span>
-            <div>
-              <p className="metric-title">Run log</p>
-              <p className="dashboard-support-title">Add a session fast</p>
-              <p className="dashboard-support-copy">
-                Capture distance, duration, heart rate, and notes without leaving the dashboard flow.
-              </p>
-            </div>
-          </Link>
-        </div>
-      </section>
+      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} sx={{ mb: 3 }} alignItems="stretch">
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              <Chip color="primary" icon={<TargetIcon size={14} />} label="Weekly focus" size="small" />
+              <Chip
+                color={summary ? 'success' : 'default'}
+                icon={<SyncIcon size={14} />}
+                label={summary ? 'Current week loaded' : 'Ready for first sync'}
+                size="small"
+              />
+            </Stack>
+            <Typography variant="h5" fontWeight={700} gutterBottom>
+              {weeklyFocusTitle}
+            </Typography>
+            <Typography variant="body1" color="text.secondary" paragraph>
+              {weeklyFocusDescription}
+            </Typography>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip icon={<DistanceIcon size={14} />} label={summary ? `${summary.totalDistance.toFixed(1)} km this week` : 'Weekly load tracking'} variant="outlined" />
+              <Chip icon={<ClockIcon size={14} />} label={summary ? `${totalHours} hours logged` : 'Training time overview'} variant="outlined" />
+              <Chip icon={<TrendIcon size={14} />} label="Trend-aware coaching" variant="outlined" />
+            </Stack>
+          </CardContent>
+        </Card>
+        <Stack spacing={2} sx={{ width: { lg: 360 } }}>
+          <SupportLinkCard
+            description="Readiness, risk, and next workout guidance in one focused workflow."
+            icon={CoachIcon}
+            title={summary ? 'Review this training week' : 'Open when your data is ready'}
+            to="/recommendations"
+            subtitle="Coach review"
+          />
+          <SupportLinkCard
+            description="Refresh Strava and keep your mobile activity history accurate."
+            icon={SyncIcon}
+            title="Keep workouts current"
+            to="/strava-connect"
+            subtitle="Data sync"
+          />
+          <SupportLinkCard
+            description="Capture distance, duration, heart rate, and notes without leaving the dashboard flow."
+            icon={ActivityIcon}
+            title="Add a session fast"
+            to="/activities"
+            subtitle="Run log"
+          />
+        </Stack>
+      </Stack>
 
-      <section className="mb-8">
-        <div className="dashboard-section-header">
-          <div>
-            <p className="eyebrow">Weekly metrics</p>
-            <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Current training snapshot
-            </h2>
-          </div>
-          <p className="dashboard-section-copy">
-            Volume, pace, elevation, and heart-rate trends for the current week.
-          </p>
-        </div>
-      </section>
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="overline" color="primary" fontWeight={700}>
+          Weekly metrics
+        </Typography>
+        <Typography variant="h5" fontWeight={700}>
+          Current training snapshot
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 480, mt: 0.5 }}>
+          Volume, pace, elevation, and heart-rate trends for the current week.
+        </Typography>
+      </Box>
 
       {statusMessage && (
-        <section className="mb-8">
-          <div className="page-banner">{statusMessage}</div>
-        </section>
+        <Box sx={{ mb: 2 }}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="body2">{statusMessage}</Typography>
+            </CardContent>
+          </Card>
+        </Box>
       )}
 
       {loading ? (
-        <section className="section-card">
-          <p className="empty-state">Loading your weekly stats...</p>
-        </section>
+        <Card variant="outlined">
+          <CardContent>
+            <Typography color="text.secondary">Loading your weekly stats...</Typography>
+          </CardContent>
+        </Card>
       ) : summary ? (
-        <section className="grid gap-6 lg:grid-cols-3">
+        <Box
+          sx={{
+            display: 'grid',
+            gap: 2,
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }
+          }}
+        >
           {statCards.map((card) => (
-            <StatsCard
-              key={card.title}
-              hint={card.hint}
-              icon={card.icon}
-              title={card.title}
-              value={card.value}
-            />
+            <StatsCard key={card.title} hint={card.hint} icon={card.icon} title={card.title} value={card.value} />
           ))}
-        </section>
+        </Box>
       ) : (
-        <section className="section-card">
-          <p className="empty-state">No activities this week. Start by adding activities or connecting Strava.</p>
-        </section>
+        <Card variant="outlined">
+          <CardContent>
+            <Typography color="text.secondary">
+              No activities this week. Start by adding activities or connecting Strava.
+            </Typography>
+          </CardContent>
+        </Card>
       )}
 
-      <section className="mt-8 section-card">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="eyebrow">Workflows</p>
-            <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Common training actions</h2>
-          </div>
-          <p className="m-0 max-w-xl text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-            Jump straight into the actions you are most likely to need during the week, with larger touch targets and clearer entry points.
-          </p>
-        </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {quickActions.map(({ description, icon: Icon, title, to }) => (
-            <Link key={title} to={to} className="quick-action-card">
-              <span className="icon-shell" aria-hidden="true">
-                <Icon size={18} />
-              </span>
-              <strong>{title}</strong>
-              <p>{description}</p>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </main>
+      <Card variant="outlined" sx={{ mt: 3 }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'flex-end' }}>
+            <Box>
+              <Typography variant="overline" color="primary" fontWeight={700}>
+                Workflows
+              </Typography>
+              <Typography variant="h5" fontWeight={700}>
+                Common training actions
+              </Typography>
+            </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 480 }}>
+              Jump straight into the actions you are most likely to need during the week, with larger touch targets and
+              clearer entry points.
+            </Typography>
+          </Stack>
+          <Box
+            sx={{
+              mt: 3,
+              display: 'grid',
+              gap: 2,
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }
+            }}
+          >
+            {quickActions.map(({ description, icon: Icon, title, to }) => (
+              <Card
+                key={title}
+                component={RouterLink}
+                to={to}
+                variant="outlined"
+                sx={{
+                  textDecoration: 'none',
+                  height: '100%',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+                }}
+              >
+                <CardContent>
+                  <Box
+                    sx={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: 2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      mb: 1.5
+                    }}
+                  >
+                    <Icon size={18} />
+                  </Box>
+                  <Typography variant="subtitle1" fontWeight={700} color="text.primary" gutterBottom>
+                    {title}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+        </CardContent>
+      </Card>
+    </Box>
+  );
+}
+
+function SupportLinkCard({ subtitle, title, description, to, icon: Icon }) {
+  return (
+    <Card
+      component={RouterLink}
+      to={to}
+      variant="outlined"
+      sx={{
+        textDecoration: 'none',
+        transition: 'transform 0.15s, box-shadow 0.15s',
+        '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
+      }}
+    >
+      <CardContent>
+        <Stack direction="row" spacing={2} alignItems="flex-start">
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 2,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              flexShrink: 0
+            }}
+          >
+            <Icon size={18} />
+          </Box>
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+              {subtitle}
+            </Typography>
+            <Typography variant="subtitle1" fontWeight={700} color="text.primary" display="block" sx={{ mt: 0.5 }}>
+              {title}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              {description}
+            </Typography>
+          </Box>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 }
 

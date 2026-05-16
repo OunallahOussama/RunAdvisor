@@ -1,4 +1,4 @@
-const CACHE_NAME = 'runadvisor-shell-v2';
+const CACHE_NAME = 'runadvisor-shell-v3';
 const APP_SHELL_URL = '/';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
@@ -73,6 +73,13 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.mode === 'navigate') {
+    const isOAuthCallback = url.pathname === '/callback' && url.search.length > 1;
+
+    if (isOAuthCallback) {
+      event.respondWith(fetch(request));
+      return;
+    }
+
     event.respondWith(
       fetch(request)
         .then((response) => updateCache(request, response))

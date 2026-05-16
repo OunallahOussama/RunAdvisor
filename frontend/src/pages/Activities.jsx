@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import { activitiesApi } from '../services/api';
 import ActivityCard from '../components/ActivityCard';
 import {
@@ -68,9 +77,9 @@ function Activities() {
       const activityData = {
         ...newActivity,
         distance: parseFloat(newActivity.distance),
-        duration: parseInt(newActivity.duration),
-        elevationGain: newActivity.elevationGain ? parseInt(newActivity.elevationGain) : 0,
-        avgHeartRate: newActivity.avgHeartRate ? parseInt(newActivity.avgHeartRate) : null
+        duration: parseInt(newActivity.duration, 10),
+        elevationGain: newActivity.elevationGain ? parseInt(newActivity.elevationGain, 10) : 0,
+        avgHeartRate: newActivity.avgHeartRate ? parseInt(newActivity.avgHeartRate, 10) : null
       };
 
       await activitiesApi.createActivity(activityData);
@@ -104,192 +113,245 @@ function Activities() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-      <section className="mb-8 section-card">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="eyebrow">Run log</p>
-            <h1 className="section-heading">Run Log & Training Dashboard</h1>
-            <p className="section-subtitle">A mobile-first racing and run tracking experience with pace, distance, and recovery insights.</p>
-          </div>
-          <div className="metric-panel max-w-sm">
-            <p className="metric-title">Mobile tip</p>
-            <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>Tap "View details" on any activity card to expand notes, pace insights, and recovery cues.</p>
-          </div>
-        </div>
-      </section>
+    <Box component="main">
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between">
+            <Box>
+              <Typography variant="overline" color="primary" fontWeight={700}>
+                Run log
+              </Typography>
+              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+                Run Log & Training Dashboard
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 560 }}>
+                A mobile-first racing and run tracking experience with pace, distance, and recovery insights.
+              </Typography>
+            </Box>
+            <Card variant="outlined" sx={{ maxWidth: 360, bgcolor: 'action.hover' }}>
+              <CardContent>
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Mobile tip
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  Tap &quot;View details&quot; on any activity card to expand notes, pace insights, and recovery cues.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Stack>
+        </CardContent>
+      </Card>
 
       {statusMessage && (
-        <section className="mb-8">
-          <div className="page-banner">{statusMessage}</div>
-        </section>
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">{statusMessage}</Alert>
+        </Box>
       )}
 
-      <section className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
-        <div className="space-y-6">
-          <div className="section-card">
-            <div className="flex items-center gap-3">
-              <span className="icon-shell">
-                <ActivityIcon size={18} />
-              </span>
-              <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Manual run log</h2>
-            </div>
-            <form onSubmit={handleAddActivity} className="mt-5 grid gap-4 sm:grid-cols-2">
-              <label className="field-label">
-                <span>Activity name</span>
-                <input
-                  type="text"
-                  placeholder="Morning run, long run, recovery jog"
-                  value={newActivity.name}
-                  onChange={(e) => setNewActivity({ ...newActivity, name: e.target.value })}
-                  required
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label">
-                <span>Activity type</span>
-                <select
-                  value={newActivity.type}
-                  onChange={(e) => setNewActivity({ ...newActivity, type: e.target.value })}
-                  className="select-shell"
+      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} alignItems="flex-start">
+        <Stack spacing={3} sx={{ flex: 1, width: 1 }}>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText'
+                  }}
                 >
-                  <option value="run">Run</option>
-                  <option value="walk">Walk</option>
-                  <option value="trail run">Trail Run</option>
-                </select>
-              </label>
-              <label className="field-label">
-                <span>Distance (km)</span>
-                <input
-                  type="number"
-                  placeholder="8.5"
-                  value={newActivity.distance}
-                  onChange={(e) => setNewActivity({ ...newActivity, distance: e.target.value })}
-                  required
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label">
-                <span>Duration (minutes)</span>
-                <input
-                  type="number"
-                  placeholder="52"
-                  value={newActivity.duration}
-                  onChange={(e) => setNewActivity({ ...newActivity, duration: e.target.value })}
-                  required
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label">
-                <span>Date</span>
-                <input
-                  type="date"
-                  value={newActivity.date}
-                  onChange={(e) => setNewActivity({ ...newActivity, date: e.target.value })}
-                  required
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label">
-                <span>Elevation gain (m)</span>
-                <input
-                  type="number"
-                  placeholder="120"
-                  value={newActivity.elevationGain}
-                  onChange={(e) => setNewActivity({ ...newActivity, elevationGain: e.target.value })}
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label">
-                <span>Avg Heart Rate (bpm)</span>
-                <input
-                  type="number"
-                  placeholder="148"
-                  value={newActivity.avgHeartRate}
-                  onChange={(e) => setNewActivity({ ...newActivity, avgHeartRate: e.target.value })}
-                  className="input-shell"
-                />
-              </label>
-              <label className="field-label col-span-full">
-                <span>Notes</span>
-                <textarea
-                  placeholder="How did it feel? Any pacing notes, terrain, or recovery reminders?"
-                  value={newActivity.notes}
-                  onChange={(e) => setNewActivity({ ...newActivity, notes: e.target.value })}
-                  className="textarea-shell"
-                  rows={3}
-                />
-              </label>
-              <button type="submit" className="btn-primary col-span-full">
-                <ActivityIcon size={16} />
-                Add activity
-              </button>
-            </form>
-          </div>
+                  <ActivityIcon size={18} />
+                </Box>
+                <Typography variant="h5" component="h2" fontWeight={600}>
+                  Manual run log
+                </Typography>
+              </Stack>
+              <Box component="form" onSubmit={handleAddActivity}>
+                <Box
+                  sx={{
+                    display: 'grid',
+                    gap: 2,
+                    gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }
+                  }}
+                >
+                  <TextField
+                    fullWidth
+                    label="Activity name"
+                    onChange={(e) => setNewActivity({ ...newActivity, name: e.target.value })}
+                    placeholder="Morning run, long run, recovery jog"
+                    required
+                    value={newActivity.name}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Activity type"
+                    onChange={(e) => setNewActivity({ ...newActivity, type: e.target.value })}
+                    select
+                    value={newActivity.type}
+                  >
+                    <MenuItem value="run">Run</MenuItem>
+                    <MenuItem value="walk">Walk</MenuItem>
+                    <MenuItem value="trail run">Trail Run</MenuItem>
+                  </TextField>
+                  <TextField
+                    fullWidth
+                    label="Distance (km)"
+                    onChange={(e) => setNewActivity({ ...newActivity, distance: e.target.value })}
+                    placeholder="8.5"
+                    required
+                    type="number"
+                    value={newActivity.distance}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Duration (minutes)"
+                    onChange={(e) => setNewActivity({ ...newActivity, duration: e.target.value })}
+                    placeholder="52"
+                    required
+                    type="number"
+                    value={newActivity.duration}
+                  />
+                  <TextField
+                    fullWidth
+                    InputLabelProps={{ shrink: true }}
+                    label="Date"
+                    onChange={(e) => setNewActivity({ ...newActivity, date: e.target.value })}
+                    required
+                    type="date"
+                    value={newActivity.date}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Elevation gain (m)"
+                    onChange={(e) => setNewActivity({ ...newActivity, elevationGain: e.target.value })}
+                    placeholder="120"
+                    type="number"
+                    value={newActivity.elevationGain}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Avg Heart Rate (bpm)"
+                    onChange={(e) => setNewActivity({ ...newActivity, avgHeartRate: e.target.value })}
+                    placeholder="148"
+                    type="number"
+                    value={newActivity.avgHeartRate}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Notes"
+                    minRows={3}
+                    multiline
+                    onChange={(e) => setNewActivity({ ...newActivity, notes: e.target.value })}
+                    placeholder="How did it feel? Any pacing notes, terrain, or recovery reminders?"
+                    sx={{ gridColumn: { sm: '1 / -1' } }}
+                    value={newActivity.notes}
+                  />
+                  <Box sx={{ gridColumn: { sm: '1 / -1' } }}>
+                    <Button startIcon={<ActivityIcon size={18} />} type="submit" variant="contained" size="large">
+                      Add activity
+                    </Button>
+                  </Box>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
 
-          <div className="section-card">
-            <div className="flex items-center gap-3">
-              <span className="icon-shell icon-shell-soft">
-                <CalendarIcon size={18} />
-              </span>
-              <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Upcoming race preview</h2>
-            </div>
-            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Use Coach Review to attach these activities to your next race and see readiness, risk, and pacing suggestions.</p>
-          </div>
-        </div>
+          <Card variant="outlined">
+            <CardContent>
+              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+                <Box
+                  sx={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 2,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    bgcolor: 'action.selected'
+                  }}
+                >
+                  <CalendarIcon size={18} />
+                </Box>
+                <Typography variant="h6" fontWeight={600}>
+                  Upcoming race preview
+                </Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary">
+                Use Coach Review to attach these activities to your next race and see readiness, risk, and pacing suggestions.
+              </Typography>
+            </CardContent>
+          </Card>
+        </Stack>
 
-        <div className="section-card space-y-4 xl:sticky xl:top-6">
-          <div>
-            <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Run summary</h3>
-            <p className="mt-2" style={{ color: 'var(--text-secondary)' }}>Your recent training metrics for goal pacing and race readiness.</p>
-          </div>
-          <div className="activity-metric-grid text-sm">
-            <div className="activity-metric">
-              <p className="activity-metric-label"><ActivityIcon size={14} /> Runs logged</p>
-              <p className="activity-metric-value">{runActivities.length}</p>
-            </div>
-            <div className="activity-metric">
-              <p className="activity-metric-label"><PaceIcon size={14} /> Average pace</p>
-              <p className="activity-metric-value">{averagePace ? `${averagePace} min/km` : 'N/A'}</p>
-            </div>
-            <div className="activity-metric">
-              <p className="activity-metric-label"><DistanceIcon size={14} /> Distance</p>
-              <p className="activity-metric-value">{totalDistance} km</p>
-            </div>
-            <div className="activity-metric">
-              <p className="activity-metric-label"><TrailIcon size={14} /> Longest run</p>
-              <p className="activity-metric-value">{longestRun} km</p>
-            </div>
-            <div className="activity-metric">
-              <p className="activity-metric-label"><ElevationIcon size={14} /> Elevation</p>
-              <p className="activity-metric-value">{totalElevation} m</p>
-            </div>
-            <div className="activity-metric">
-              <p className="activity-metric-label"><HeartIcon size={14} /> Recovery check</p>
-              <p className="activity-metric-value">{runActivities.length ? 'Ready for review' : 'Add data first'}</p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <Card variant="outlined" sx={{ width: { xl: 320 }, flexShrink: 0, position: { xl: 'sticky' }, top: { xl: 16 } }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Run summary
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Your recent training metrics for goal pacing and race readiness.
+            </Typography>
+            <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: '1fr 1fr' }}>
+              <SummaryMetric icon={ActivityIcon} label="Runs logged" value={runActivities.length} />
+              <SummaryMetric icon={PaceIcon} label="Average pace" value={averagePace ? `${averagePace} min/km` : 'N/A'} />
+              <SummaryMetric icon={DistanceIcon} label="Distance" value={`${totalDistance} km`} />
+              <SummaryMetric icon={TrailIcon} label="Longest run" value={`${longestRun} km`} />
+              <SummaryMetric icon={ElevationIcon} label="Elevation" value={`${totalElevation} m`} />
+              <SummaryMetric
+                icon={HeartIcon}
+                label="Recovery check"
+                value={runActivities.length ? 'Ready for review' : 'Add data first'}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      </Stack>
 
-      <section className="grid gap-6">
+      <Box sx={{ mt: 3 }}>
         {loading ? (
-          <div className="section-card">
-            <p className="empty-state">Loading activities...</p>
-          </div>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography color="text.secondary">Loading activities...</Typography>
+            </CardContent>
+          </Card>
         ) : activities.length === 0 ? (
-          <div className="section-card">
-            <p className="empty-state">No activities found. Start by syncing with Strava or adding a manual activity.</p>
-          </div>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography color="text.secondary">
+                No activities found. Start by syncing with Strava or adding a manual activity.
+              </Typography>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid gap-5">
+          <Stack spacing={2}>
             {activities.map((activity) => (
               <ActivityCard key={activity._id} activity={activity} onDelete={handleDeleteActivity} />
             ))}
-          </div>
+          </Stack>
         )}
-      </section>
-    </main>
+      </Box>
+    </Box>
+  );
+}
+
+function SummaryMetric({ icon: Icon, label, value }) {
+  return (
+    <Box sx={{ p: 1.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+        <Icon size={14} />
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          {label}
+        </Typography>
+      </Stack>
+      <Typography variant="body2" fontWeight={700}>
+        {value}
+      </Typography>
+    </Box>
   );
 }
 

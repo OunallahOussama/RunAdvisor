@@ -2,6 +2,15 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { authApi, stravaApi } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getStravaRedirectUri } from '../utils/strava';
+import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import MenuItem from '@mui/material/MenuItem';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import {
   CalendarIcon,
   CoachIcon,
@@ -71,6 +80,10 @@ function StravaConnect() {
       return `Strava connected and ${count || 0} recent activities synced into RunAdvisor.`;
     }
 
+    if (syncState === 'background') {
+      return 'Strava connected. Recent activities are syncing in the background — you can use manual sync if needed.';
+    }
+
     if (syncState === 'manual') {
       return 'Strava connected, but the automatic sync did not finish. Use the manual sync button below.';
     }
@@ -128,6 +141,40 @@ function StravaConnect() {
     }
   }, [statusFromQuery]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    if (params.get('sync') !== 'background') {
+      return undefined;
+    }
+
+    let attempts = 0;
+    const initialSyncAt = profile?.stravaLastSyncAt;
+
+    const intervalId = window.setInterval(async () => {
+      attempts += 1;
+
+      try {
+        const profileResponse = await authApi.getProfile();
+        const nextProfile = profileResponse.data.user;
+        setProfile(nextProfile);
+
+        if (nextProfile?.stravaLastSyncAt && nextProfile.stravaLastSyncAt !== initialSyncAt) {
+          setStatus('Background sync finished. Your recent Strava activities are in RunAdvisor.');
+          window.clearInterval(intervalId);
+        }
+      } catch (error) {
+        console.error('Error polling Strava sync status:', error);
+      }
+
+      if (attempts >= 10) {
+        window.clearInterval(intervalId);
+      }
+    }, 3000);
+
+    return () => window.clearInterval(intervalId);
+  }, [location.search, profile?.stravaLastSyncAt]);
+
   const handleStravaConnect = () => {
     if (!stravaClientId) {
       setStatus('Missing Strava configuration. Check your frontend environment variables.');
@@ -164,11 +211,12 @@ function StravaConnect() {
 
     try {
       setUploading(true);
-      setStatus(`Uploading ${selectedFile.name}...`);
+      const fileName = selectedFile.name;
+      setStatus(`Uploading ${fileName}...`);
       const dataUrl = await readFileAsDataUrl(selectedFile);
 
       await stravaApi.uploadTrainingPlan({
-        fileName: selectedFile.name,
+        fileName,
         contentType: selectedFile.type || 'application/octet-stream',
         sizeBytes: selectedFile.size,
         dataUrl,
@@ -178,7 +226,7 @@ function StravaConnect() {
       setSelectedFile(null);
       setPlanNotes('');
       await loadPageData();
-      setStatus(`Stored ${selectedFile.name} in your RunAdvisor profile.`);
+      setStatus(`Stored ${fileName} in your RunAdvisor profile.`);
     } catch (error) {
       console.error('Error uploading training plan:', error);
       setStatus(error.response?.data?.message || 'Unable to upload this training plan.');
@@ -216,231 +264,309 @@ function StravaConnect() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-        <section className="section-card">
-          <p className="empty-state">Loading your Strava profile...</p>
-        </section>
-      </main>
+      <Card variant="outlined">
+        <CardContent>
+          <Typography color="text.secondary">Loading your Strava profile...</Typography>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-10">
-      <section className="section-card mb-8">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="eyebrow">Sync workspace</p>
-            <h1 className="section-heading">Strava Sync & Plan Hub</h1>
-            <p className="section-subtitle">Connect Strava, sync recent runs, and store your current training plan in-app for quick reference.</p>
-          </div>
-          <div className="metric-panel">
-            <p className="metric-title">Last sync</p>
-            <p className="mt-2">{formatTimestamp(profile?.stravaLastSyncAt)}</p>
-          </div>
-        </div>
-      </section>
+    <Box component="main">
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} justifyContent="space-between" alignItems={{ xl: 'flex-end' }}>
+            <Box>
+              <Typography variant="overline" color="primary" fontWeight={700}>
+                Sync workspace
+              </Typography>
+              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
+                Strava Sync & Plan Hub
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640 }}>
+                Connect Strava, sync recent runs, and store your current training plan in-app for quick reference.
+              </Typography>
+            </Box>
+            <Card variant="outlined" sx={{ bgcolor: 'action.hover', minWidth: { xl: 200 } }}>
+              <CardContent>
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                  Last sync
+                </Typography>
+                <Typography variant="body1" sx={{ mt: 1 }}>
+                  {formatTimestamp(profile?.stravaLastSyncAt)}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Stack>
+        </CardContent>
+      </Card>
 
       {offlineMessage && (
-        <section className="mb-8">
-          <div className="page-banner">{offlineMessage}</div>
-        </section>
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">{offlineMessage}</Alert>
+        </Box>
       )}
 
       {status && (
-        <section className="mb-8 page-banner">
-          <p>{status}</p>
-        </section>
+        <Box sx={{ mb: 2 }}>
+          <Alert severity="info">{status}</Alert>
+        </Box>
       )}
 
-      <section className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="section-card">
-          <div className="flex flex-col gap-6">
-            <div>
-              <div className="flex items-center gap-3">
-                <span className="icon-shell">
-                  <RunAdvisorMark size={18} />
-                </span>
-                <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Strava account status</h2>
-              </div>
-              <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>
-                {isStravaConnected
-                  ? 'Your Strava account is linked. Sync recent activities whenever you want a fresh coach review.'
-                  : 'Connect your Strava account to pull in recent training automatically and use it in coach review.'}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={handleStravaConnect}
-                className="btn-primary"
-                type="button"
+      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} sx={{ mb: 3 }}>
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText'
+                }}
               >
-                <SyncIcon size={16} />
+                <RunAdvisorMark size={18} />
+              </Box>
+              <Typography variant="h5" fontWeight={600}>
+                Strava account status
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              {isStravaConnected
+                ? 'Your Strava account is linked. Sync recent activities whenever you want a fresh coach review.'
+                : 'Connect your Strava account to pull in recent training automatically and use it in coach review.'}
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={1.5}>
+              <Button startIcon={<SyncIcon size={16} />} onClick={handleStravaConnect} variant="contained">
                 {isStravaConnected ? 'Reconnect Strava' : 'Connect with Strava'}
-              </button>
+              </Button>
               {isStravaConnected && (
-                <button
-                  onClick={handleManualSync}
-                  className="btn-secondary"
-                  type="button"
+                <Button
                   disabled={syncing}
+                  onClick={handleManualSync}
+                  startIcon={<SyncIcon size={16} />}
+                  variant="outlined"
                 >
-                  <SyncIcon size={16} />
                   {syncing ? 'Syncing...' : 'Sync recent activities'}
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => navigate('/recommendations')}
-                className="btn-secondary"
-                type="button"
-              >
-                <CoachIcon size={16} />
+              <Button onClick={() => navigate('/recommendations')} startIcon={<CoachIcon size={16} />} variant="outlined">
                 Open Coach Review
-              </button>
-            </div>
-          </div>
-        </div>
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
 
-        <div className="section-card space-y-4">
-          <div className="metric-panel">
-            <p className="metric-title">Connection</p>
-            <p className="metric-emphasis">{isStravaConnected ? 'Connected' : 'Not connected'}</p>
-          </div>
-          <div className="metric-panel">
-            <p className="metric-title">Training plans stored</p>
-            <p className="metric-emphasis">{plans.length}</p>
-          </div>
-          <div className="metric-panel">
-            <p className="metric-title">Profile email</p>
-            <p className="mt-2 break-all text-sm" style={{ color: 'var(--text-primary)' }}>{profile?.email || 'Unavailable'}</p>
-          </div>
-        </div>
-      </section>
+        <Stack spacing={2} sx={{ width: { xl: 320 } }}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                Connection
+              </Typography>
+              <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                {isStravaConnected ? 'Connected' : 'Not connected'}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                Training plans stored
+              </Typography>
+              <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
+                {plans.length}
+              </Typography>
+            </CardContent>
+          </Card>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
+                Profile email
+              </Typography>
+              <Typography variant="body2" sx={{ mt: 1, wordBreak: 'break-all' }}>
+                {profile?.email || 'Unavailable'}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Stack>
+      </Stack>
 
-      <section className="mb-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="section-card">
-          <div className="flex items-center gap-3">
-            <span className="icon-shell">
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ mb: 3 }}>
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText'
+                }}
+              >
+                <UploadIcon size={18} />
+              </Box>
+              <Typography variant="h5" fontWeight={600}>
+                Upload training plan
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Store the plan file inside RunAdvisor so it stays next to your synced training data. This MVP keeps files in-app
+              rather than exporting them into Strava.
+            </Typography>
+            <Box component="form" onSubmit={handleTrainingPlanUpload}>
+              <Stack spacing={2}>
+                <Button component="label" variant="outlined">
+                  Choose file
+                  <input hidden type="file" onChange={(event) => setSelectedFile(event.target.files?.[0] || null)} />
+                </Button>
+                <TextField
+                  fullWidth
+                  label="Notes"
+                  minRows={3}
+                  multiline
+                  onChange={(event) => setPlanNotes(event.target.value)}
+                  placeholder="Example: 12-week half marathon plan from coach."
+                  value={planNotes}
+                />
+                {selectedFile && (
+                  <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
+                    <CardContent>
+                      <Typography fontWeight={600}>{selectedFile.name}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatFileSize(selectedFile.size)}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                )}
+                <Button disabled={uploading} startIcon={<UploadIcon size={16} />} type="submit" variant="contained">
+                  {uploading ? 'Uploading plan...' : 'Upload to profile'}
+                </Button>
+              </Stack>
+            </Box>
+          </CardContent>
+        </Card>
+
+        <Card variant="outlined" sx={{ flex: 1 }}>
+          <CardContent>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  bgcolor: 'action.selected'
+                }}
+              >
+                <TargetIcon size={18} />
+              </Box>
+              <Typography variant="h5" fontWeight={600}>
+                Stored plans
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              Download or remove any plan you have saved in-app.
+            </Typography>
+            <Stack spacing={2}>
+              {plans.length === 0 ? (
+                <Alert severity="info">No training plans uploaded yet.</Alert>
+              ) : (
+                plans.map((plan) => (
+                  <Card key={plan.id} variant="outlined">
+                    <CardContent>
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={2}
+                        justifyContent="space-between"
+                        alignItems={{ sm: 'flex-start' }}
+                      >
+                        <Box>
+                          <Typography fontWeight={600}>{plan.fileName}</Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {formatFileSize(plan.sizeBytes)} • Uploaded {formatTimestamp(plan.uploadedAt)}
+                          </Typography>
+                          {plan.notes && (
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                              {plan.notes}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            onClick={() => handleDownloadPlan(plan.id, plan.fileName)}
+                            startIcon={<DownloadIcon size={16} />}
+                            variant="outlined"
+                          >
+                            Download
+                          </Button>
+                          <Button color="error" onClick={() => handleDeletePlan(plan.id)} variant="contained">
+                            Delete
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </Stack>
+          </CardContent>
+        </Card>
+      </Stack>
+
+      <Card variant="outlined">
+        <CardContent>
+          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: 2,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'action.selected'
+              }}
+            >
+              <InstallIcon size={18} />
+            </Box>
+            <Typography variant="h6" fontWeight={600}>
+              How this MVP works
+            </Typography>
+          </Stack>
+          <Stack component="ul" spacing={2} sx={{ m: 0, pl: 0, listStyle: 'none' }}>
+            <Stack component="li" direction="row" spacing={2} alignItems="flex-start">
+              <CalendarIcon size={18} />
+              <Typography variant="body2" color="text.secondary">
+                Authorize RunAdvisor with Strava. The callback now attempts an immediate recent-activity sync.
+              </Typography>
+            </Stack>
+            <Stack component="li" direction="row" spacing={2} alignItems="flex-start">
+              <SyncIcon size={18} />
+              <Typography variant="body2" color="text.secondary">
+                Use manual sync any time you want to refresh the activities that power coach review and recommendations.
+              </Typography>
+            </Stack>
+            <Stack component="li" direction="row" spacing={2} alignItems="flex-start">
               <UploadIcon size={18} />
-            </span>
-            <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Upload training plan</h2>
-          </div>
-          <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Store the plan file inside RunAdvisor so it stays next to your synced training data. This MVP keeps files in-app rather than exporting them into Strava.</p>
-
-          <form onSubmit={handleTrainingPlanUpload} className="mt-5 grid gap-4">
-            <label className="field-label">
-              <span>Plan file</span>
-              <input
-                type="file"
-                onChange={(event) => setSelectedFile(event.target.files?.[0] || null)}
-                className="input-shell"
-              />
-            </label>
-
-            <label className="field-label">
-              <span>Notes</span>
-              <textarea
-                value={planNotes}
-                onChange={(event) => setPlanNotes(event.target.value)}
-                placeholder="Example: 12-week half marathon plan from coach."
-                rows={3}
-                className="textarea-shell"
-              />
-            </label>
-
-            {selectedFile && (
-              <div className="note-box text-sm">
-                <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{selectedFile.name}</p>
-                <p className="mt-1">{formatFileSize(selectedFile.size)}</p>
-              </div>
-            )}
-
-            <button type="submit" className="btn-primary w-full sm:w-auto" disabled={uploading}>
-              <UploadIcon size={16} />
-              {uploading ? 'Uploading plan...' : 'Upload to profile'}
-            </button>
-          </form>
-        </div>
-
-        <div className="section-card">
-          <div className="flex items-center gap-3">
-            <span className="icon-shell icon-shell-soft">
-              <TargetIcon size={18} />
-            </span>
-            <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Stored plans</h2>
-          </div>
-          <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>Download or remove any plan you have saved in-app.</p>
-
-          <div className="mt-5 grid gap-4">
-            {plans.length === 0 ? (
-              <div className="note-box">
-                <p>No training plans uploaded yet.</p>
-              </div>
-            ) : (
-              plans.map((plan) => (
-                <div key={plan.id} className="note-box">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{plan.fileName}</p>
-                      <p className="mt-2 text-sm" style={{ color: 'var(--text-tertiary)' }}>
-                        {formatFileSize(plan.sizeBytes)} • Uploaded {formatTimestamp(plan.uploadedAt)}
-                      </p>
-                      {plan.notes && <p className="mt-3 text-sm">{plan.notes}</p>}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => handleDownloadPlan(plan.id, plan.fileName)}
-                        className="btn-secondary"
-                        type="button"
-                      >
-                        <DownloadIcon size={16} />
-                        Download
-                      </button>
-                      <button
-                        onClick={() => handleDeletePlan(plan.id)}
-                        className="btn-danger"
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-card">
-        <div className="flex items-center gap-3">
-          <span className="icon-shell icon-shell-soft">
-            <InstallIcon size={18} />
-          </span>
-          <h3 className="m-0 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>How this MVP works</h3>
-        </div>
-        <ul className="coach-list mt-4">
-          <li className="coach-list-item">
-            <span className="icon-shell icon-shell-soft">
-              <CalendarIcon size={14} />
-            </span>
-            <span>Authorize RunAdvisor with Strava. The callback now attempts an immediate recent-activity sync.</span>
-          </li>
-          <li className="coach-list-item">
-            <span className="icon-shell icon-shell-soft">
-              <SyncIcon size={14} />
-            </span>
-            <span>Use manual sync any time you want to refresh the activities that power coach review and recommendations.</span>
-          </li>
-          <li className="coach-list-item">
-            <span className="icon-shell icon-shell-soft">
-              <UploadIcon size={14} />
-            </span>
-            <span>Upload your current plan into RunAdvisor for in-app storage and easy download later.</span>
-          </li>
-        </ul>
-      </section>
-    </main>
+              <Typography variant="body2" color="text.secondary">
+                Upload your current plan into RunAdvisor for in-app storage and easy download later.
+              </Typography>
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Box>
   );
 }
 

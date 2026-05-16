@@ -1,6 +1,7 @@
 const express = require('express');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { invalidateUserCache } = require('../services/userResolver');
 
 const router = express.Router();
 
@@ -140,6 +141,7 @@ router.post('/sync', auth, async (req, res) => {
     user.authProvider = 'auth0';
     user.updatedAt = new Date();
     await user.save();
+    invalidateUserCache(req.auth0?.sub);
 
     res.json({
       success: true,
@@ -184,6 +186,7 @@ router.put('/preferences', auth, async (req, res) => {
       },
       { new: true }
     );
+    invalidateUserCache(req.auth0?.sub);
 
     res.json({ success: true, user: serializeUser(user) });
   } catch (error) {

@@ -1,18 +1,19 @@
 const express = require('express');
-const axios = require('axios');
+const mongoose = require('mongoose');
 const Activity = require('../models/Activity');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const { validateStravaAuthenticate, validateSyncRecent } = require('../middleware/validate');
+const { pickStravaActivityDetail } = require('../utils/pickStravaActivityDetail');
+const {
+  persistStravaTokens,
+  prepareUserForStravaApi,
+  stravaAxios
+} = require('../utils/stravaCredentials');
 
 const router = express.Router();
 const MAX_TRAINING_PLAN_BYTES = 2 * 1024 * 1024;
-
-// Configure axios for Strava API calls
-const stravaAxios = axios.create({
-  httpsAgent: new (require('https').Agent)({
-    rejectUnauthorized: process.env.NODE_ENV === 'production'
-  })
-});
+const backgroundSyncs = new Set();
 
 function formatStravaProviderErrors(errors) {
   if (!Array.isArray(errors) || errors.length === 0) {
@@ -104,20 +105,80 @@ function serializeTrainingPlan(plan, includeDataUrl = false) {
   };
 }
 
-async function ensureConnectedUser(userId) {
-  const user = await User.findById(userId);
+function stravaActivityRequestErrorPayload(error) {
+  const status = error.response?.status;
+  const data = error.response?.data;
 
-  if (!user?.stravaAccessToken || !user?.stravaRefreshToken || !user?.stravaId) {
-    const error = new Error('Connect Strava first before syncing activities.');
-    error.statusCode = 400;
-    throw error;
+  if (status === 404) {
+    return {
+      status: 404,
+      message: 'That activity was not found on Strava. It may have been deleted or is no longer visible to your account.'
+    };
   }
 
-  if (user.stravaExpiresAt && new Date() > user.stravaExpiresAt) {
-    await refreshStravaToken(user);
+  if (status === 429) {
+    const retryAfterRaw = error.response?.headers?.['retry-after'];
+    const retryAfter = retryAfterRaw != null ? Number(retryAfterRaw) : undefined;
+    return {
+      status: 429,
+      message: 'Strava rate limit reached. Please wait a few minutes and try again.',
+      retryAfter: Number.isFinite(retryAfter) ? retryAfter : undefined
+    };
   }
 
-  return user;
+  if (status === 401 || status === 403) {
+    return {
+      status: 401,
+      message: 'Strava rejected this request. Reconnect Strava from the Strava page if this keeps happening.'
+    };
+  }
+
+  const providerMessage = typeof data?.message === 'string' ? data.message : '';
+  return {
+    status: typeof status === 'number' && status >= 400 && status < 600 ? status : 502,
+    message: providerMessage || error.message || 'Unable to load this activity from Strava right now.'
+  };
+}
+
+async function findOwnedActivityForStravaDetail(userId, identifier) {
+  const id = String(identifier || '').trim();
+
+  if (!id) {
+    return null;
+  }
+
+  const uid = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+
+  if (/^[a-fA-F0-9]{24}$/.test(id)) {
+    const byMongo = await Activity.findOne({ _id: id, userId: uid });
+
+    if (byMongo) {
+      return byMongo;
+    }
+  }
+
+  return Activity.findOne({ userId: uid, stravaActivityId: id });
+}
+
+function scheduleBackgroundStravaSync(userId, limit = 20) {
+  const syncKey = String(userId);
+
+  if (backgroundSyncs.has(syncKey)) {
+    return;
+  }
+
+  backgroundSyncs.add(syncKey);
+
+  setImmediate(async () => {
+    try {
+      const { user, accessToken } = await prepareUserForStravaApi(userId);
+      await syncRecentActivitiesForUser(userId, user, accessToken, limit);
+    } catch (error) {
+      console.error('Background Strava sync failed:', error.message || error);
+    } finally {
+      backgroundSyncs.delete(syncKey);
+    }
+  });
 }
 
 function buildActivityUpdate(userId, activity) {
@@ -149,10 +210,10 @@ function buildActivityUpdate(userId, activity) {
   };
 }
 
-async function syncRecentActivitiesForUser(userId, user, limit = 20) {
+async function syncRecentActivitiesForUser(userId, user, accessToken, limit = 20) {
   const response = await stravaAxios.get('https://www.strava.com/api/v3/athlete/activities', {
     headers: {
-      Authorization: `Bearer ${user.stravaAccessToken}`
+      Authorization: `Bearer ${accessToken}`
     },
     params: {
       per_page: limit
@@ -193,7 +254,7 @@ async function syncRecentActivitiesForUser(userId, user, limit = 20) {
  * Exchange Strava authorization code for access token
  * POST /api/strava/authenticate
  */
-router.post('/authenticate', auth, async (req, res) => {
+router.post('/authenticate', auth, validateStravaAuthenticate, async (req, res) => {
   try {
     const { code, redirectUri } = req.body;
     const userId = req.userId;
@@ -225,17 +286,19 @@ router.post('/authenticate', auth, async (req, res) => {
     const { access_token, refresh_token, expires_at } = response.data;
     const athlete = response.data.athlete;
 
-    await User.findByIdAndUpdate(userId, {
+    await persistStravaTokens(userId, {
       stravaId: athlete.id,
-      stravaAccessToken: access_token,
-      stravaRefreshToken: refresh_token,
-      stravaExpiresAt: new Date(expires_at * 1000)
+      accessToken: access_token,
+      refreshToken: refresh_token,
+      expiresAt: new Date(expires_at * 1000)
     });
+
+    scheduleBackgroundStravaSync(userId, 20);
 
     res.json({
       success: true,
       athlete,
-      accessToken: access_token
+      syncStarted: true
     });
   } catch (error) {
     const errData = error.response?.data || { message: error.message };
@@ -253,11 +316,11 @@ router.post('/authenticate', auth, async (req, res) => {
  * Sync and return recent activities from Strava
  * POST /api/strava/sync-recent
  */
-router.post('/sync-recent', auth, async (req, res) => {
+router.post('/sync-recent', auth, validateSyncRecent, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.body.limit || req.query.limit, 10) || 20, 50);
-    const user = await ensureConnectedUser(req.userId);
-    const syncResult = await syncRecentActivitiesForUser(req.userId, user, limit);
+    const limit = req.syncLimit;
+    const { user, accessToken } = await prepareUserForStravaApi(req.userId);
+    const syncResult = await syncRecentActivitiesForUser(req.userId, user, accessToken, limit);
 
     res.json({
       success: true,
@@ -281,8 +344,8 @@ router.post('/sync-recent', auth, async (req, res) => {
 router.get('/activities', auth, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 50);
-    const user = await ensureConnectedUser(req.userId);
-    const syncResult = await syncRecentActivitiesForUser(req.userId, user, limit);
+    const { user, accessToken } = await prepareUserForStravaApi(req.userId);
+    const syncResult = await syncRecentActivitiesForUser(req.userId, user, accessToken, limit);
 
     res.json({
       success: true,
@@ -301,17 +364,82 @@ router.get('/activities', auth, async (req, res) => {
 });
 
 /**
+ * Strava rich activity payload (GET https://www.strava.com/api/v3/activities/{id})
+ * for an activity the user already owns in Mongo (by _id or stravaActivityId).
+ * GET /api/strava/activities/:identifier/detail
+ */
+router.get('/activities/:identifier/detail', auth, async (req, res) => {
+  try {
+    const { user, accessToken } = await prepareUserForStravaApi(req.userId);
+    const activity = await findOwnedActivityForStravaDetail(req.userId, req.params.identifier);
+
+    if (!activity) {
+      return res.status(404).json({
+        error: 'Activity not found',
+        message: 'No matching activity in your log, or you do not have access to it.'
+      });
+    }
+
+    if (!activity.stravaActivityId) {
+      return res.status(400).json({
+        error: 'Not a Strava activity',
+        message: 'This entry is manual-only. Open Strava-synced activities to see map and Strava fields.'
+      });
+    }
+
+    const response = await stravaAxios.get(
+      `https://www.strava.com/api/v3/activities/${activity.stravaActivityId}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      }
+    );
+
+    const detail = pickStravaActivityDetail(response.data);
+
+    res.json({
+      success: true,
+      stravaActivityId: activity.stravaActivityId,
+      localActivityId: activity._id,
+      detail
+    });
+  } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({
+        error: 'Strava not connected',
+        message: error.message || 'Connect Strava first.'
+      });
+    }
+
+    if (error.response) {
+      const mapped = stravaActivityRequestErrorPayload(error);
+      console.error('Strava activity detail HTTP error:', mapped);
+      return res.status(mapped.status).json({
+        error: 'Strava activity detail failed',
+        message: mapped.message,
+        ...(mapped.retryAfter != null ? { retryAfter: mapped.retryAfter } : {})
+      });
+    }
+
+    console.error('Strava activity detail error:', error);
+    res.status(500).json({
+      error: 'Strava activity detail failed',
+      message: error.message || 'Unexpected error fetching Strava activity detail.'
+    });
+  }
+});
+
+/**
  * Sync single activity details
  * POST /api/strava/sync-activity/:activityId
  */
 router.post('/sync-activity/:activityId', auth, async (req, res) => {
   try {
-    const user = await ensureConnectedUser(req.userId);
+    const { accessToken } = await prepareUserForStravaApi(req.userId);
 
     const response = await stravaAxios.get(
       `https://www.strava.com/api/v3/activities/${req.params.activityId}`,
       {
-        headers: { Authorization: `Bearer ${user.stravaAccessToken}` }
+        headers: { Authorization: `Bearer ${accessToken}` }
       }
     );
 
@@ -469,23 +597,6 @@ router.delete('/training-plans/:planId', auth, async (req, res) => {
     res.status(500).json({ error: 'Failed to delete training plan' });
   }
 });
-
-/**
- * Helper function to refresh Strava token
- */
-async function refreshStravaToken(user) {
-  const response = await stravaAxios.post('https://www.strava.com/api/v3/oauth/token', {
-    client_id: process.env.STRAVA_CLIENT_ID,
-    client_secret: process.env.STRAVA_CLIENT_SECRET,
-    grant_type: 'refresh_token',
-    refresh_token: user.stravaRefreshToken
-  });
-
-  user.stravaAccessToken = response.data.access_token;
-  user.stravaRefreshToken = response.data.refresh_token;
-  user.stravaExpiresAt = new Date(response.data.expires_at * 1000);
-  await user.save();
-}
 
 /**
  * Generate performance vector from activity metrics
