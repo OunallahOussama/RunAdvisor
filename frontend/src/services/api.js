@@ -24,6 +24,15 @@ export const setApiNotifier = (notifier) => {
   apiNotifier = notifier;
 };
 
+export function shouldRetryServerError(config) {
+  if (!config || config._serverRetried) {
+    return false;
+  }
+
+  const method = String(config.method || 'get').toLowerCase();
+  return method === 'get' || method === 'head';
+}
+
 function formatRateLimitMessage(error) {
   const retryAfter = error.response?.headers?.['retry-after'] || error.response?.data?.retryAfter;
   const base = error.response?.data?.message || 'Too many requests. Please slow down and try again.';
@@ -77,7 +86,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (response.status >= 500 && config && !config._serverRetried) {
+    if (response.status >= 500 && shouldRetryServerError(config)) {
       config._serverRetried = true;
       await new Promise((resolve) => setTimeout(resolve, 400));
       return api(config);
@@ -98,6 +107,7 @@ export const authApi = {
 export const activitiesApi = {
   getActivities: (limit = 20, skip = 0) => api.get('/activities', { params: { limit, skip } }),
   getActivity: (id) => api.get(`/activities/${id}`),
+  getSimilarActivities: (id) => api.get(`/activities/${id}/similar`),
   getWeeklySummary: () => api.get('/activities/summary/weekly'),
   createActivity: (activity) => api.post('/activities', activity),
   deleteActivity: (id) => api.delete(`/activities/${id}`)
@@ -113,7 +123,10 @@ export const stravaApi = {
   getTrainingPlans: () => api.get('/strava/training-plans'),
   getTrainingPlan: (planId) => api.get(`/strava/training-plans/${planId}`),
   uploadTrainingPlan: (payload) => api.post('/strava/training-plans', payload),
-  deleteTrainingPlan: (planId) => api.delete(`/strava/training-plans/${planId}`)
+  deleteTrainingPlan: (planId) => api.delete(`/strava/training-plans/${planId}`),
+  getAthleteStats: () => api.get('/strava/athlete/stats'),
+  getActivityStreams: (identifier) => api.get(`/strava/activities/${encodeURIComponent(identifier)}/streams`),
+  getActivitySegments: (identifier) => api.get(`/strava/activities/${encodeURIComponent(identifier)}/segments`)
 };
 
 // Recommendations endpoints
@@ -135,6 +148,19 @@ export const vectorSearchApi = {
   search: (vector, limit = 10, userSpecific = true) => api.post('/vector-search', { vector, limit, userSpecific }),
   searchByDistance: (min, max) => api.get('/vector-search/by-distance', { params: { min, max } }),
   searchByPace: (min, max) => api.get('/vector-search/by-pace', { params: { min, max } })
+};
+
+export const coachApi = {
+  weeklySummary: (days = 28) => api.post('/coach/weekly-summary', { days }),
+  semanticSearch: (q) => api.get('/coach/semantic-search', { params: { q } }),
+  trackUsage: (event, metadata) => api.post('/coach/track-usage', { event, metadata })
+};
+
+export const adminApi = {
+  getMe: () => api.get('/admin/me'),
+  getOverview: (days = 7) => api.get('/admin/overview', { params: { days } }),
+  getUsage: (days = 7) => api.get('/admin/usage', { params: { days } }),
+  getInsights: (days = 7) => api.get('/admin/insights', { params: { days } })
 };
 
 export default api;

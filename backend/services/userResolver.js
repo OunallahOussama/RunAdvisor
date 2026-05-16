@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { getClaimEmail } = require('../utils/authClaims');
 
 const CACHE_TTL_MS = 60 * 1000;
 const userCache = new Map();
@@ -38,13 +39,21 @@ function invalidateUserCache(auth0UserId) {
 
 async function resolveUserFromClaims(claims = {}) {
   const auth0UserId = claims.sub;
-  const normalizedEmail = typeof claims.email === 'string'
-    ? claims.email.toLowerCase()
-    : undefined;
+  const normalizedEmail = getClaimEmail(claims);
 
   const cached = getCachedUser(auth0UserId);
 
   if (cached && cached._authFingerprint === claimsFingerprint(claims)) {
+    if (!cached.email) {
+      const fresh = await User.findOne({ auth0UserId });
+
+      if (fresh?.email) {
+        fresh._authFingerprint = claimsFingerprint(claims);
+        setCachedUser(auth0UserId, fresh);
+        return fresh;
+      }
+    }
+
     return cached;
   }
 

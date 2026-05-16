@@ -14,10 +14,12 @@ import Typography from '@mui/material/Typography';
 import GoogleIcon from '@mui/icons-material/Google';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import { CoachIcon, RunAdvisorMark, TargetIcon, TrendIcon } from '../components/icons';
+import AuthLegalNotice from '../components/AuthLegalNotice';
 
 function Login({ onGoogleLogin }) {
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
       <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggleButton compact />
       </Box>
@@ -54,7 +56,7 @@ function Login({ onGoogleLogin }) {
               <ListItemIcon sx={{ minWidth: 36 }}>
                 <CoachIcon size={18} />
               </ListItemIcon>
-              <ListItemText primary="Installable mobile coaching workspace" />
+              <ListItemText primary="Install on your phone for quick access" />
             </ListItem>
           </List>
           <Button fullWidth size="large" variant="contained" startIcon={<GoogleIcon />} onClick={onGoogleLogin}>
@@ -67,8 +69,10 @@ function Login({ onGoogleLogin }) {
               Create one here
             </Link>
           </Typography>
+          <AuthLegalNotice />
         </Stack>
       </Paper>
+    </Box>
     </Box>
   );
 }

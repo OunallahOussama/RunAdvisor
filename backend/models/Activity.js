@@ -23,6 +23,25 @@ const activitySchema = new mongoose.Schema({
   
   // Performance vectors (for ML)
   performanceVector: [Number],
+  semanticVector: [Number],
+  streamSummary: {
+    pointCount: Number,
+    time: [Number],
+    distance: [Number],
+    altitude: [Number],
+    heartrate: [Number],
+    cadence: [Number],
+    paceMinPerKm: [Number],
+    fetchedAt: Date
+  },
+  segmentEfforts: [{
+    id: Number,
+    name: String,
+    distance: Number,
+    elapsedTime: Number,
+    prRank: Number,
+    komRank: Number
+  }],
   
   // Metadata
   date: Date,

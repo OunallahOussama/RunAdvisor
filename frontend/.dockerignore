@@ -5,5 +5,4 @@ npm-debug.log
 .env
 README.md
 .dockerignore
-public/manifest.json
 build/

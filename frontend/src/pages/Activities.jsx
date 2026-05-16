@@ -20,6 +20,7 @@ import {
   TrailIcon
 } from '../components/icons';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
+import SemanticSearchBar from '../components/SemanticSearchBar';
 
 const ACTIVITIES_CACHE_KEY = 'activities-feed';
 
@@ -114,6 +115,7 @@ function Activities() {
 
   return (
     <Box component="main">
+      <SemanticSearchBar />
       <Card variant="outlined" sx={{ mb: 3 }}>
         <CardContent>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between">

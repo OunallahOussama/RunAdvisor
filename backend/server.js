@@ -13,6 +13,8 @@ const {
   authLimiter,
   stravaLimiter
 } = require('./middleware/rateLimit');
+const { buildCorsOptions } = require('./utils/corsOrigins');
+const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
@@ -23,8 +25,18 @@ if (process.env.TRUST_PROXY === '1' || process.env.NODE_ENV === 'production') {
 // Middleware
 app.use(helmet());
 app.use(compression());
-app.use(cors());
-app.use(express.json({ limit: '3mb' }));
+app.use(cors(buildCorsOptions()));
+app.use(express.json({
+  limit: '3mb',
+  verify: (req, _res, buf) => {
+    if (req.originalUrl === '/api/strava/webhook') {
+      req.rawBody = buf.toString('utf8');
+    }
+  }
+}));
+
+const usageTracker = require('./middleware/usageTracker');
+app.use('/api', usageTracker);
 app.use('/api', generalApiLimiter);
 
 // MongoDB Connection
@@ -35,15 +47,23 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://mongodb:27017/runadvisor'
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.log('MongoDB connection error:', err));
 
+// Strava webhooks (no JWT — verified via hub token)
+app.use('/api/strava', require('./routes/stravaWebhooks'));
+
 // Routes
 app.use('/api/auth', authLimiter, require('./routes/auth'));
 app.use('/api/activities', require('./routes/activities'));
 app.use('/api/recommendations', require('./routes/recommendations'));
 app.use('/api/vector-search', require('./routes/vectorSearch'));
+app.use('/api/coach', require('./routes/coach'));
+app.use('/api/admin', require('./routes/admin'));
 app.use('/api/strava', stravaLimiter, require('./routes/strava'));
 
 // Health checks
 app.use('/health', require('./routes/health'));
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

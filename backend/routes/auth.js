@@ -1,7 +1,9 @@
 const express = require('express');
 const User = require('../models/User');
+const Activity = require('../models/Activity');
 const auth = require('../middleware/auth');
 const { invalidateUserCache } = require('../services/userResolver');
+const { buildUserPreferenceVector } = require('../services/vectorSegments');
 
 const router = express.Router();
 
@@ -48,6 +50,11 @@ function serializeUser(user) {
     experience: user.experience,
     preferredDistance: user.preferredDistance,
     trainingGoals: user.trainingGoals,
+    goalPaceMinPerKm: user.goalPaceMinPerKm,
+    weeklyTrainingLoadKm: user.weeklyTrainingLoadKm,
+    goalRaceName: user.goalRaceName,
+    goalRaceDate: user.goalRaceDate,
+    goalRaceDistanceKm: user.goalRaceDistanceKm,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -71,8 +78,12 @@ async function mergeUserByEmail(currentUser, { email, name, picture }) {
   const mergedUser = existingUser;
 
   if (currentUser.auth0UserId) {
-    await User.deleteOne({ _id: currentUser._id });
+    await Activity.updateMany(
+      { userId: currentUser._id },
+      { $set: { userId: mergedUser._id } }
+    );
     mergedUser.auth0UserId = currentUser.auth0UserId;
+    await User.deleteOne({ _id: currentUser._id });
   }
 
   mergedUser.authProvider = 'auth0';
@@ -173,19 +184,33 @@ router.get('/me', auth, async (req, res) => {
  */
 router.put('/preferences', auth, async (req, res) => {
   try {
-    const { age, experience, preferredDistance, trainingGoals } = req.body;
-    
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      { 
-        age, 
-        experience, 
-        preferredDistance, 
-        trainingGoals,
-        updatedAt: new Date()
-      },
-      { new: true }
-    );
+    const {
+      age,
+      experience,
+      preferredDistance,
+      trainingGoals,
+      goalPaceMinPerKm,
+      weeklyTrainingLoadKm,
+      goalRaceName,
+      goalRaceDate,
+      goalRaceDistanceKm
+    } = req.body;
+
+    const update = { updatedAt: new Date() };
+
+    if (age != null) update.age = Number(age);
+    if (experience != null) update.experience = experience;
+    if (preferredDistance != null) update.preferredDistance = Number(preferredDistance);
+    if (Array.isArray(trainingGoals)) update.trainingGoals = trainingGoals;
+    if (goalPaceMinPerKm != null) update.goalPaceMinPerKm = Number(goalPaceMinPerKm);
+    if (weeklyTrainingLoadKm != null) update.weeklyTrainingLoadKm = Number(weeklyTrainingLoadKm);
+    if (goalRaceName != null) update.goalRaceName = String(goalRaceName).trim();
+    if (goalRaceDate != null) update.goalRaceDate = goalRaceDate ? new Date(goalRaceDate) : null;
+    if (goalRaceDistanceKm != null) update.goalRaceDistanceKm = Number(goalRaceDistanceKm);
+
+    const user = await User.findByIdAndUpdate(req.userId, update, { new: true });
+    user.preferenceVector = buildUserPreferenceVector(user);
+    await user.save();
     invalidateUserCache(req.auth0?.sub);
 
     res.json({ success: true, user: serializeUser(user) });

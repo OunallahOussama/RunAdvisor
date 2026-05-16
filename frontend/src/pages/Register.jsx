@@ -14,10 +14,12 @@ import Typography from '@mui/material/Typography';
 import GoogleIcon from '@mui/icons-material/Google';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import { CoachIcon, RecoveryIcon, RunAdvisorMark, TargetIcon } from '../components/icons';
+import AuthLegalNotice from '../components/AuthLegalNotice';
 
 function Register({ onGoogleSignup }) {
   return (
-    <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
+    <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
       <Box sx={{ position: 'absolute', top: 16, right: 16 }}>
         <ThemeToggleButton compact />
       </Box>
@@ -67,8 +69,10 @@ function Register({ onGoogleSignup }) {
               Sign in here
             </Link>
           </Typography>
+          <AuthLegalNotice />
         </Stack>
       </Paper>
+    </Box>
     </Box>
   );
 }

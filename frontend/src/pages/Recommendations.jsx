@@ -16,6 +16,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import TrainingTrendChart from '../components/TrainingTrendChart';
 import TrainingMetricsCharts from '../components/TrainingMetricsCharts';
+import TrainingProgressCard from '../components/TrainingProgressCard';
 import {
   ActivityIcon,
   BoltIcon,
@@ -30,7 +31,7 @@ import {
   TrendIcon,
   WarningIcon
 } from '../components/icons';
-import { recommendationsApi } from '../services/api';
+import { coachApi, recommendationsApi } from '../services/api';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
 
 const RECOMMENDATIONS_CACHE_KEY = 'recommendations-insights';
@@ -170,6 +171,11 @@ function Recommendations() {
   const [lastWeekSummary, setLastWeekSummary] = useState(null);
   const [dailyMetrics, setDailyMetrics] = useState([]);
   const [weeklyRacePaceProjection, setWeeklyRacePaceProjection] = useState([]);
+  const [trainingProgress, setTrainingProgress] = useState(null);
+  const [vectorInsights, setVectorInsights] = useState(null);
+  const [weeklySummary, setWeeklySummary] = useState(null);
+  const [loadRisk, setLoadRisk] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
 
   const raceDays = raceDate ? Math.max(0, Math.ceil((new Date(raceDate) - Date.now()) / (24 * 60 * 60 * 1000))) : null;
 
@@ -212,7 +218,9 @@ function Recommendations() {
         setLastWeekSummary(coachReviewData.lastWeekSummary || null);
         setDailyMetrics(coachReviewData.dailyMetrics || []);
         setWeeklyRacePaceProjection(coachReviewData.weeklyRacePaceProjection || []);
-        setReviewMessage(coachReviewData.message || 'Coach review ready.');
+        setTrainingProgress(coachReviewData.trainingProgress || null);
+        setVectorInsights(coachReviewData.vectorInsights || null);
+        setReviewMessage(coachReviewData.message || 'Training review ready.');
       } else {
         console.error('Error fetching coach review:', coachReviewResult.reason);
         setCoachReview(null);
@@ -222,7 +230,7 @@ function Recommendations() {
         setLastWeekSummary(null);
         setDailyMetrics([]);
         setWeeklyRacePaceProjection([]);
-        setReviewMessage('Unable to load your coach review right now.');
+        setReviewMessage('Unable to load your training review right now.');
       }
 
       if (recommendationData || coachReviewData) {
@@ -234,7 +242,9 @@ function Recommendations() {
           racePacePrediction: coachReviewData?.racePacePrediction || null,
           recommendations: recommendationData?.recommendations || [],
           request,
-          reviewMessage: coachReviewData?.message || 'Coach review ready.',
+          trainingProgress: coachReviewData?.trainingProgress || null,
+          vectorInsights: coachReviewData?.vectorInsights || null,
+          reviewMessage: coachReviewData?.message || 'Training review ready.',
           summary: coachReviewData?.summary || null,
           trend: coachReviewData?.trend || [],
           weeklyRacePaceProjection: coachReviewData?.weeklyRacePaceProjection || []
@@ -253,8 +263,10 @@ function Recommendations() {
           setDailyMetrics(cachedInsights.data.dailyMetrics || []);
           setWeeklyRacePaceProjection(cachedInsights.data.weeklyRacePaceProjection || []);
           setMessage(cachedInsights.data.message || 'Showing your last saved recommendations.');
-          setReviewMessage(cachedInsights.data.reviewMessage || 'Showing your last saved coach review.');
-          setOfflineMessage(`Using your saved coach review from ${formatSnapshotTimestamp(cachedInsights.savedAt)}.`);
+          setTrainingProgress(cachedInsights.data.trainingProgress || null);
+          setVectorInsights(cachedInsights.data.vectorInsights || null);
+          setReviewMessage(cachedInsights.data.reviewMessage || 'Showing your last saved training review.');
+          setOfflineMessage(`Using your saved training review from ${formatSnapshotTimestamp(cachedInsights.savedAt)}.`);
         }
       }
     } finally {
@@ -289,6 +301,20 @@ function Recommendations() {
     });
   };
 
+  const handleWeeklySummary = async () => {
+    setSummaryLoading(true);
+
+    try {
+      const response = await coachApi.weeklySummary(days);
+      setWeeklySummary(response.data.summary);
+      setLoadRisk(response.data.loadRisk);
+    } catch (err) {
+      console.error('Weekly summary error:', err);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   return (
     <Box component="main">
       <Card variant="outlined" sx={{ mb: 3 }}>
@@ -296,13 +322,13 @@ function Recommendations() {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3} justifyContent="space-between" alignItems={{ sm: 'flex-start' }}>
             <Box>
               <Typography variant="overline" color="primary" fontWeight={700}>
-                Coach workspace
+                Training insights
               </Typography>
               <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-                Coach Review & Recommendations
+                Training review
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640 }}>
-                A recent-training review that turns your Strava sync and manual logs into trend-aware coaching guidance.
+                Your recent runs, goal pace, and weekly load turned into clear guidance and similar-run patterns.
               </Typography>
             </Box>
             <TextField
@@ -324,6 +350,105 @@ function Recommendations() {
         <Box sx={{ mb: 2 }}>
           <Alert severity="info">{offlineMessage}</Alert>
         </Box>
+      )}
+
+      <Box sx={{ mb: 3 }}>
+        <TrainingProgressCard progress={trainingProgress} />
+      </Box>
+
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+            <Box>
+              <Typography variant="h6" fontWeight={600}>
+                Smart weekly summary
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Personalized narrative from your recent training and goals.
+              </Typography>
+            </Box>
+            <Button disabled={summaryLoading} onClick={handleWeeklySummary} variant="contained">
+              {summaryLoading ? 'Generating…' : 'Generate summary'}
+            </Button>
+          </Stack>
+          {weeklySummary && (
+            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                {weeklySummary.headline}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                {weeklySummary.summary}
+              </Typography>
+              {weeklySummary.bullets?.length > 0 && (
+                <Box component="ul" sx={{ mt: 1.5, pl: 2.5, mb: 0 }}>
+                  {weeklySummary.bullets.map((bullet) => (
+                    <Typography key={bullet} component="li" variant="body2" color="text.secondary">
+                      {bullet}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+              {loadRisk && (
+                <Alert severity={loadRisk.risk === 'elevated' ? 'warning' : 'info'} sx={{ mt: 2 }}>
+                  {loadRisk.message}
+                </Alert>
+              )}
+            </Box>
+          )}
+        </CardContent>
+      </Card>
+
+      {vectorInsights?.similarSegments?.length > 0 && (
+        <Card variant="outlined" sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Similar run segments
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Cosine similarity across pace, volume, and terrain blocks in your recent activities.
+            </Typography>
+            <Stack spacing={1.5}>
+              {vectorInsights.similarSegments.map((match) => (
+                <Box
+                  key={`${match.baseActivity.id}-${match.similarActivity.id}-${match.segmentKey}`}
+                  sx={{ p: 1.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'action.hover' }}
+                >
+                  <Typography variant="body2" fontWeight={600}>
+                    {match.segmentLabel} · {(match.similarity * 100).toFixed(0)}% match
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {match.baseActivity.name} ↔ {match.similarActivity.name}
+                  </Typography>
+                </Box>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+
+      {vectorInsights?.profileMatches?.length > 0 && (
+        <Card variant="outlined" sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Runs closest to your goals
+            </Typography>
+            <Stack spacing={1}>
+              {vectorInsights.profileMatches.map((match) => (
+                <Stack
+                  key={match.activityId}
+                  direction="row"
+                  justifyContent="space-between"
+                  sx={{ py: 0.5, borderBottom: 1, borderColor: 'divider' }}
+                >
+                  <Typography variant="body2">{match.name}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {(match.similarity * 100).toFixed(0)}% fit · {match.pace} min/km
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </CardContent>
+        </Card>
       )}
 
       <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} sx={{ mb: 3 }} alignItems="stretch">
@@ -374,7 +499,7 @@ function Recommendations() {
                   value={raceDate}
                 />
                 <Button startIcon={<TrendIcon size={16} />} type="submit" variant="contained">
-                  Refresh coach review
+                  Refresh review
                 </Button>
               </Stack>
             </Box>
@@ -402,7 +527,7 @@ function Recommendations() {
               </Typography>
             </Stack>
             <Typography variant="body2" color="text.secondary" paragraph>
-              Use the same race inputs for both the coach review and the action plan below.
+              Use the same race inputs for your training review and action plan below.
             </Typography>
             <Stack spacing={2}>
               <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
@@ -428,7 +553,7 @@ function Recommendations() {
               <Card variant="outlined" sx={{ bgcolor: 'action.hover' }}>
                 <CardContent>
                   <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                    Coach mode
+                    Readiness
                   </Typography>
                   <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>
                     {coachReview ? capitalizeLabel(coachReview.readiness) : 'Pending'}
@@ -458,7 +583,7 @@ function Recommendations() {
         {loading ? (
           <Card variant="outlined">
             <CardContent>
-              <Typography color="text.secondary">Generating coach review...</Typography>
+              <Typography color="text.secondary">Preparing your training review…</Typography>
             </CardContent>
           </Card>
         ) : (
@@ -550,7 +675,7 @@ function Recommendations() {
               <Card variant="outlined">
                 <CardContent>
                   <Typography color="text.secondary">
-                    No recent activities are available for coach review yet. Sync Strava or add manual logs first.
+                    No recent activities yet. Sync Strava or add a manual log to get started.
                   </Typography>
                 </CardContent>
               </Card>
@@ -578,7 +703,7 @@ function Recommendations() {
                             <CoachIcon size={18} />
                           </Box>
                           <Typography variant="h5" fontWeight={600}>
-                            Coach review
+                            Training review
                           </Typography>
                         </Stack>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
@@ -601,7 +726,7 @@ function Recommendations() {
                         icon={CheckIcon}
                         items={coachReview?.positives}
                         title="What is going well"
-                        empty="More data is needed before the coach can call out strong positives."
+                        empty="Log a few more runs to highlight what is going well."
                       />
                       <InsightPanel
                         icon={WarningIcon}
@@ -719,7 +844,7 @@ function Recommendations() {
 
                         {rec.reasoning && (
                           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                            Coach note: {rec.reasoning}
+                            Why this matters: {rec.reasoning}
                           </Typography>
                         )}
                         {rec.whyNow && (

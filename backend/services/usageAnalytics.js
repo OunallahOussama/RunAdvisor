@@ -1,0 +1,191 @@
+const User = require('../models/User');
+const Activity = require('../models/Activity');
+const UsageEvent = require('../models/UsageEvent');
+
+async function countSince(model, filter, since) {
+  return model.countDocuments({
+    ...filter,
+    createdAt: { $gte: since }
+  });
+}
+
+async function aggregateUsageByEvent(since) {
+  return UsageEvent.aggregate([
+    { $match: { createdAt: { $gte: since } } },
+    {
+      $group: {
+        _id: '$event',
+        count: { $sum: 1 },
+        avgDurationMs: { $avg: '$durationMs' },
+        uniqueUsers: { $addToSet: '$userId' }
+      }
+    },
+    {
+      $project: {
+        event: '$_id',
+        count: 1,
+        avgDurationMs: { $round: ['$avgDurationMs', 0] },
+        uniqueUsers: { $size: '$uniqueUsers' }
+      }
+    },
+    { $sort: { count: -1 } }
+  ]);
+}
+
+async function dailyUsageSeries(since, days = 7) {
+  return UsageEvent.aggregate([
+    { $match: { createdAt: { $gte: since } } },
+    {
+      $group: {
+        _id: {
+          $dateToString: { format: '%Y-%m-%d', date: '$createdAt' }
+        },
+        requests: { $sum: 1 },
+        errors: {
+          $sum: {
+            $cond: [{ $gte: ['$statusCode', 400] }, 1, 0]
+          }
+        }
+      }
+    },
+    { $sort: { _id: 1 } },
+    { $limit: days }
+  ]);
+}
+
+async function buildAdminOverview(days = 7) {
+  const windowDays = Math.min(Math.max(Number(days) || 7, 1), 90);
+  const now = Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  const since24h = new Date(now - dayMs);
+  const sinceWindow = new Date(now - windowDays * dayMs);
+
+  const [
+    totalUsers,
+    stravaConnected,
+    totalActivities,
+    activeUsers7d,
+    requests24h,
+    requests7d,
+    usageByEvent,
+    dailySeries
+  ] = await Promise.all([
+    User.countDocuments(),
+    User.countDocuments({ stravaId: { $exists: true, $ne: null } }),
+    Activity.countDocuments(),
+    UsageEvent.distinct('userId', { createdAt: { $gte: sinceWindow }, userId: { $ne: null } }),
+    UsageEvent.countDocuments({ createdAt: { $gte: since24h } }),
+    UsageEvent.countDocuments({ createdAt: { $gte: sinceWindow } }),
+    aggregateUsageByEvent(sinceWindow),
+    dailyUsageSeries(sinceWindow, Math.min(windowDays, 30))
+  ]);
+
+  const newUsersWindow = await countSince(User, {}, sinceWindow);
+  const newActivitiesWindow = await Activity.countDocuments({ createdAt: { $gte: sinceWindow } });
+  const clientErrorsWindow = await UsageEvent.countDocuments({
+    createdAt: { $gte: sinceWindow },
+    statusCode: { $gte: 400, $lt: 500 }
+  });
+  const serverErrorsWindow = await UsageEvent.countDocuments({
+    createdAt: { $gte: sinceWindow },
+    statusCode: { $gte: 500 }
+  });
+
+  return {
+    totals: {
+      users: totalUsers,
+      activities: totalActivities,
+      stravaConnected
+    },
+    windowDays,
+    activity: {
+      activeUsers: activeUsers7d.length,
+      newUsers: newUsersWindow,
+      newActivities: newActivitiesWindow,
+      requests24h,
+      requestsWindow: requests7d,
+      clientErrors: clientErrorsWindow,
+      serverErrors: serverErrorsWindow,
+      errorRatePct: requests7d
+        ? Math.round(((clientErrorsWindow + serverErrorsWindow) / requests7d) * 1000) / 10
+        : 0
+    },
+    usageByEvent,
+    dailySeries: dailySeries.map((row) => ({
+      date: row._id,
+      requests: row.requests,
+      errors: row.errors
+    })),
+    generatedAt: new Date().toISOString()
+  };
+}
+
+async function buildApplicationInsights(days = 7) {
+  const windowDays = Math.min(Math.max(Number(days) || 7, 1), 90);
+  const since7d = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+
+  const [slowRequests, errorEvents, topPaths] = await Promise.all([
+    UsageEvent.find({
+      createdAt: { $gte: since7d },
+      durationMs: { $gte: 2000 }
+    })
+      .sort({ durationMs: -1 })
+      .limit(10)
+      .select('path method durationMs statusCode createdAt event')
+      .lean(),
+    UsageEvent.countDocuments({
+      createdAt: { $gte: since7d },
+      statusCode: { $gte: 500 }
+    }),
+    UsageEvent.aggregate([
+      { $match: { createdAt: { $gte: since7d } } },
+      { $group: { _id: '$path', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 15 }
+    ])
+  ]);
+
+  const [avgLatency, statusBreakdown] = await Promise.all([
+    UsageEvent.aggregate([
+      { $match: { createdAt: { $gte: since7d }, durationMs: { $exists: true } } },
+      { $group: { _id: null, avg: { $avg: '$durationMs' }, max: { $max: '$durationMs' } } }
+    ]),
+    UsageEvent.aggregate([
+      { $match: { createdAt: { $gte: since7d }, statusCode: { $exists: true } } },
+      {
+        $group: {
+          _id: {
+            $switch: {
+              branches: [
+                { case: { $lt: ['$statusCode', 400] }, then: '2xx' },
+                { case: { $lt: ['$statusCode', 500] }, then: '4xx' },
+                { case: { $gte: ['$statusCode', 500] }, then: '5xx' }
+              ],
+              default: 'other'
+            }
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ])
+  ]);
+
+  return {
+    windowDays,
+    slowRequests,
+    serverErrors7d: errorEvents,
+    topPaths: topPaths.map((row) => ({ path: row._id, count: row.count })),
+    statusBreakdown: statusBreakdown.map((row) => ({ bucket: row._id, count: row.count })),
+    latency: {
+      avgMs: Math.round(avgLatency[0]?.avg || 0),
+      maxMs: Math.round(avgLatency[0]?.max || 0)
+    }
+  };
+}
+
+module.exports = {
+  buildAdminOverview,
+  buildApplicationInsights,
+  aggregateUsageByEvent,
+  dailyUsageSeries
+};

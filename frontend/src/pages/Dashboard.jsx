@@ -7,8 +7,10 @@ import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { activitiesApi } from '../services/api';
+import { activitiesApi, recommendationsApi } from '../services/api';
 import StatsCard from '../components/StatsCard';
+import TrainingProgressCard from '../components/TrainingProgressCard';
+import { requestNotificationPermission } from '../utils/notifications';
 import {
   ActivityIcon,
   ClockIcon,
@@ -27,6 +29,7 @@ const DASHBOARD_CACHE_KEY = 'dashboard-summary';
 
 function Dashboard() {
   const [summary, setSummary] = useState(null);
+  const [trainingProgress, setTrainingProgress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState('');
 
@@ -37,9 +40,20 @@ function Dashboard() {
   const fetchWeeklySummary = async () => {
     try {
       setLoading(true);
-      const response = await activitiesApi.getWeeklySummary();
-      setSummary(response.data.summary);
-      saveSnapshot(DASHBOARD_CACHE_KEY, response.data.summary);
+      const [summaryResponse, reviewResponse] = await Promise.allSettled([
+        activitiesApi.getWeeklySummary(),
+        recommendationsApi.getCoachReview({ days: 28 })
+      ]);
+
+      if (summaryResponse.status === 'fulfilled') {
+        setSummary(summaryResponse.value.data.summary);
+        saveSnapshot(DASHBOARD_CACHE_KEY, summaryResponse.value.data.summary);
+      }
+
+      if (reviewResponse.status === 'fulfilled') {
+        setTrainingProgress(reviewResponse.value.data.trainingProgress || null);
+      }
+
       setStatusMessage('');
     } catch (error) {
       console.error('Error fetching summary:', error);
@@ -72,14 +86,14 @@ function Dashboard() {
     {
       description: 'Review readiness, risk, and next focus with richer training context.',
       icon: CoachIcon,
-      title: 'Open coach review',
+      title: 'Open training review',
       to: '/recommendations'
     },
     {
-      description: 'Turn your recent data into a sharper race plan and pacing recommendation.',
+      description: 'Set goal pace, weekly load, and race targets for personalized insights.',
       icon: TargetIcon,
-      title: 'Plan the next race',
-      to: '/recommendations'
+      title: 'Training profile',
+      to: '/profile'
     }
   ];
 
@@ -142,7 +156,7 @@ function Dashboard() {
       value: summary ? `${totalHours} hrs` : 'Ready to track'
     },
     {
-      label: 'Coach review',
+      label: 'Training review',
       supporting: summary ? 'Readiness, pacing, and recovery insights' : 'Unlock guidance after your first sync',
       value: summary ? 'Available now' : 'Pending data'
     }
@@ -172,8 +186,8 @@ function Dashboard() {
                 Weekly training overview
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 560 }}>
-                Monitor weekly load, keep your training data current, and move quickly between logging, syncing, and coach
-                review.
+                Monitor weekly load, keep your training data current, and move quickly between logging, syncing, and your
+                training review.
               </Typography>
             </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -183,7 +197,7 @@ function Dashboard() {
                 to="/recommendations"
                 variant="contained"
               >
-                Open coach review
+                Open training review
               </Button>
               <Button component={RouterLink} startIcon={<ActivityIcon size={18} />} to="/activities" variant="outlined">
                 Log activity
@@ -210,6 +224,14 @@ function Dashboard() {
         </CardContent>
       </Card>
 
+      <Box sx={{ mb: 3 }}>
+        <TrainingProgressCard
+          compact
+          progress={trainingProgress}
+          onEnableNotifications={requestNotificationPermission}
+        />
+      </Box>
+
       <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} sx={{ mb: 3 }} alignItems="stretch">
         <Card variant="outlined" sx={{ flex: 1 }}>
           <CardContent>
@@ -231,7 +253,7 @@ function Dashboard() {
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Chip icon={<DistanceIcon size={14} />} label={summary ? `${summary.totalDistance.toFixed(1)} km this week` : 'Weekly load tracking'} variant="outlined" />
               <Chip icon={<ClockIcon size={14} />} label={summary ? `${totalHours} hours logged` : 'Training time overview'} variant="outlined" />
-              <Chip icon={<TrendIcon size={14} />} label="Trend-aware coaching" variant="outlined" />
+              <Chip icon={<TrendIcon size={14} />} label="Personalized insights" variant="outlined" />
             </Stack>
           </CardContent>
         </Card>
@@ -241,7 +263,7 @@ function Dashboard() {
             icon={CoachIcon}
             title={summary ? 'Review this training week' : 'Open when your data is ready'}
             to="/recommendations"
-            subtitle="Coach review"
+            subtitle="Training review"
           />
           <SupportLinkCard
             description="Refresh Strava and keep your mobile activity history accurate."

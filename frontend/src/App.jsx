@@ -16,12 +16,21 @@ import ActivityDetail from './pages/ActivityDetail';
 import Recommendations from './pages/Recommendations';
 import StravaConnect from './pages/StravaConnect';
 import StravaCallback from './pages/StravaCallback';
+import TrainingProfile from './pages/TrainingProfile';
+import AdminDashboard from './pages/AdminDashboard';
+import About from './pages/legal/About';
+import Cookies from './pages/legal/Cookies';
+import Privacy from './pages/legal/Privacy';
 import Navbar from './components/Navbar';
+import AppFooter from './components/AppFooter';
+import CookieConsentBanner from './components/CookieConsentBanner';
 import { OfflineIcon } from './components/icons';
+import { useCookieConsent } from './hooks/useCookieConsent';
 import { authApi, setAccessTokenGetter, setAccessTokenRefresher, setApiNotifier } from './services/api';
 import { ApiNotificationProvider, useApiNotification } from './context/ApiNotificationContext';
 import { RunAdvisorProfileProvider } from './context/RunAdvisorProfileContext';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
+import TrainingSyncManager from './components/TrainingSyncManager';
 import './App.css';
 
 function LoadingScreen({ message }) {
@@ -62,7 +71,7 @@ function AppContent() {
   const [isOnline, setIsOnline] = useState(window.navigator.onLine);
   const syncedAuth0UserRef = useRef('');
   const { canInstall, promptToInstall } = usePwaInstallPrompt();
-
+  const { bannerOpen, acceptCookies } = useCookieConsent();
   useEffect(() => {
     setApiNotifier(showNotification);
 
@@ -192,6 +201,7 @@ function AppContent() {
     <RunAdvisorProfileProvider enabled={isAuthenticated}>
       <Router>
         <Box className="App" sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+          <TrainingSyncManager enabled={isAuthenticated} />
           {isAuthenticated && (
             <Navbar
               canInstall={canInstall}
@@ -212,35 +222,42 @@ function AppContent() {
               {authError && <Alert severity="warning">Sign-in error: {authError}</Alert>}
             </Stack>
             <Routes>
-            <Route
-              path="/login"
-              element={
-                isAuthenticated ? (
-                  <Navigate to="/dashboard" />
-                ) : (
-                  <Login onGoogleLogin={() => loginWithRedirect()} />
-                )
-              }
-            />
-            <Route
-              path="/register"
-              element={
-                isAuthenticated ? (
-                  <Navigate to="/dashboard" />
-                ) : (
-                  <Register onGoogleSignup={() => loginWithRedirect()} />
-                )
-              }
-            />
-            <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/activities/:id" element={isAuthenticated ? <ActivityDetail /> : <Navigate to="/login" />} />
-            <Route path="/activities" element={isAuthenticated ? <Activities /> : <Navigate to="/login" />} />
-            <Route path="/recommendations" element={isAuthenticated ? <Recommendations /> : <Navigate to="/login" />} />
-            <Route path="/strava-connect" element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} />
-            <Route path="/callback" element={<StravaCallback />} />
-            <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/cookies" element={<Cookies />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route
+                path="/login"
+                element={
+                  isAuthenticated ? (
+                    <Navigate to="/dashboard" />
+                  ) : (
+                    <Login onGoogleLogin={() => loginWithRedirect()} />
+                  )
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  isAuthenticated ? (
+                    <Navigate to="/dashboard" />
+                  ) : (
+                    <Register onGoogleSignup={() => loginWithRedirect()} />
+                  )
+                }
+              />
+              <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
+              <Route path="/activities/:id" element={isAuthenticated ? <ActivityDetail /> : <Navigate to="/login" />} />
+              <Route path="/activities" element={isAuthenticated ? <Activities /> : <Navigate to="/login" />} />
+              <Route path="/recommendations" element={isAuthenticated ? <Recommendations /> : <Navigate to="/login" />} />
+              <Route path="/strava-connect" element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} />
+              <Route path="/profile" element={isAuthenticated ? <TrainingProfile /> : <Navigate to="/login" />} />
+              <Route path="/admin" element={isAuthenticated ? <AdminDashboard /> : <Navigate to="/login" />} />
+              <Route path="/callback" element={<StravaCallback />} />
+              <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
             </Routes>
           </Container>
+          <AppFooter />
+          <CookieConsentBanner onAccept={acceptCookies} open={bannerOpen} />
         </Box>
       </Router>
     </RunAdvisorProfileProvider>

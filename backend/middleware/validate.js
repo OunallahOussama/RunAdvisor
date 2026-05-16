@@ -54,6 +54,114 @@ function validateStravaAuthenticate(req, res, next) {
   return next();
 }
 
+const ACTIVITY_TYPES = new Set([
+  'run',
+  'outdoor run',
+  'trail run',
+  'walk',
+  'ride',
+  'other'
+]);
+
+function validateCreateActivity(req, res, next) {
+  const nameResult = requireStringField(req.body, 'name', {
+    maxLength: 200,
+    label: 'Activity name'
+  });
+
+  if (!nameResult.ok) {
+    return validationError(res, nameResult.message);
+  }
+
+  const type = String(req.body?.type || '').trim().toLowerCase();
+
+  if (!type || !ACTIVITY_TYPES.has(type)) {
+    return validationError(res, 'type must be one of: run, outdoor run, trail run, walk, ride, other.');
+  }
+
+  const distanceKm = Number(req.body?.distance);
+
+  if (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500) {
+    return validationError(res, 'distance must be a number between 0 and 500 km.');
+  }
+
+  const durationSeconds = Number(req.body?.duration);
+
+  if (!Number.isFinite(durationSeconds) || durationSeconds <= 0 || durationSeconds > 86400) {
+    return validationError(res, 'duration must be a number between 1 and 86400 seconds.');
+  }
+
+  const activityDate = new Date(req.body?.date);
+
+  if (Number.isNaN(activityDate.getTime())) {
+    return validationError(res, 'date must be a valid ISO date string.');
+  }
+
+  const optionalNumber = (field, { min, max, label }) => {
+    const raw = req.body?.[field];
+
+    if (raw == null || raw === '') {
+      return { ok: true, value: null };
+    }
+
+    const value = Number(raw);
+
+    if (!Number.isFinite(value) || value < min || value > max) {
+      return {
+        ok: false,
+        message: `${label} must be a number between ${min} and ${max}.`
+      };
+    }
+
+    return { ok: true, value };
+  };
+
+  const elevationGainResult = optionalNumber('elevationGain', { min: 0, max: 15000, label: 'elevationGain' });
+  if (!elevationGainResult.ok) {
+    return validationError(res, elevationGainResult.message);
+  }
+
+  const avgHeartRateResult = optionalNumber('avgHeartRate', { min: 30, max: 250, label: 'avgHeartRate' });
+  if (!avgHeartRateResult.ok) {
+    return validationError(res, avgHeartRateResult.message);
+  }
+
+  const maxHeartRateResult = optionalNumber('maxHeartRate', { min: 30, max: 250, label: 'maxHeartRate' });
+  if (!maxHeartRateResult.ok) {
+    return validationError(res, maxHeartRateResult.message);
+  }
+
+  const avgCadenceResult = optionalNumber('avgCadence', { min: 0, max: 300, label: 'avgCadence' });
+  if (!avgCadenceResult.ok) {
+    return validationError(res, avgCadenceResult.message);
+  }
+
+  let notes = null;
+
+  if (req.body?.notes != null && req.body.notes !== '') {
+    if (typeof req.body.notes !== 'string' || req.body.notes.length > 4000) {
+      return validationError(res, 'notes must be a string up to 4000 characters.');
+    }
+
+    notes = req.body.notes.trim();
+  }
+
+  req.validatedActivity = {
+    name: nameResult.value,
+    type,
+    distanceKm,
+    durationSeconds,
+    date: activityDate,
+    elevationGain: elevationGainResult.value ?? 0,
+    avgHeartRate: avgHeartRateResult.value,
+    maxHeartRate: maxHeartRateResult.value,
+    avgCadence: avgCadenceResult.value,
+    notes
+  };
+
+  return next();
+}
+
 function validateSyncRecent(req, res, next) {
   const rawLimit = req.body?.limit ?? req.query?.limit;
 
@@ -74,5 +182,6 @@ function validateSyncRecent(req, res, next) {
 
 module.exports = {
   validateStravaAuthenticate,
+  validateCreateActivity,
   validateSyncRecent
 };

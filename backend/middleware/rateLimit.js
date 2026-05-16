@@ -66,10 +66,17 @@ const stravaLimiter = createLimiter({
   message: 'Too many Strava API requests. Please wait before syncing or loading activities again.'
 });
 
+const stravaWebhookLimiter = createLimiter({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_STRAVA_WEBHOOK_MAX) || 120,
+  message: 'Too many Strava webhook requests.'
+});
+
 module.exports = {
   decodeJwtPayload,
   getClientKey,
   generalApiLimiter,
   authLimiter,
-  stravaLimiter
+  stravaLimiter,
+  stravaWebhookLimiter
 };

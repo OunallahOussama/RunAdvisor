@@ -189,8 +189,9 @@ function buildActivityUpdate(userId, activity) {
   }
 
   const pace = calculatePace(activity);
+  const { buildSemanticVector } = require('../services/semanticSearch');
 
-  return {
+  const update = {
     userId,
     stravaActivityId: String(activity.id),
     name: activity.name,
@@ -208,6 +209,10 @@ function buildActivityUpdate(userId, activity) {
     performanceVector: generatePerformanceVector(activity),
     notes: activity.description
   };
+
+  update.semanticVector = buildSemanticVector(update);
+
+  return update;
 }
 
 async function syncRecentActivitiesForUser(userId, user, accessToken, limit = 20) {
@@ -619,4 +624,92 @@ function generatePerformanceVector(activity) {
   ];
 }
 
+/**
+ * Athlete stats from Strava
+ * GET /api/strava/athlete/stats
+ */
+router.get('/athlete/stats', auth, async (req, res) => {
+  try {
+    const { user, accessToken } = await prepareUserForStravaApi(req.userId);
+
+    if (!user.stravaId) {
+      return res.status(400).json({ error: 'Strava not connected' });
+    }
+
+    const { fetchAthleteStats } = require('../services/stravaStreams');
+    const stats = await fetchAthleteStats(accessToken, user.stravaId);
+
+    res.json({ success: true, stats });
+  } catch (error) {
+    console.error('Athlete stats error:', error);
+    res.status(500).json({ error: 'Failed to fetch athlete stats' });
+  }
+});
+
+/**
+ * Activity streams (pace, HR, elevation)
+ * GET /api/strava/activities/:identifier/streams
+ */
+router.get('/activities/:identifier/streams', auth, async (req, res) => {
+  try {
+    const { accessToken } = await prepareUserForStravaApi(req.userId);
+    const activity = await findOwnedActivityForStravaDetail(req.userId, req.params.identifier);
+
+    if (!activity?.stravaActivityId) {
+      return res.status(400).json({ error: 'Not a Strava-linked activity' });
+    }
+
+    if (activity.streamSummary?.fetchedAt) {
+      const ageMs = Date.now() - new Date(activity.streamSummary.fetchedAt).getTime();
+
+      if (ageMs < 24 * 60 * 60 * 1000) {
+        return res.json({ success: true, streams: activity.streamSummary, cached: true });
+      }
+    }
+
+    const { fetchActivityStreams } = require('../services/stravaStreams');
+    const streams = await fetchActivityStreams(accessToken, activity.stravaActivityId);
+    streams.fetchedAt = new Date();
+
+    activity.streamSummary = streams;
+    activity.updatedAt = new Date();
+    await activity.save();
+
+    res.json({ success: true, streams, cached: false });
+  } catch (error) {
+    console.error('Streams error:', error);
+    res.status(500).json({ error: 'Failed to fetch activity streams' });
+  }
+});
+
+/**
+ * Segment efforts for an activity
+ * GET /api/strava/activities/:identifier/segments
+ */
+router.get('/activities/:identifier/segments', auth, async (req, res) => {
+  try {
+    const { accessToken } = await prepareUserForStravaApi(req.userId);
+    const activity = await findOwnedActivityForStravaDetail(req.userId, req.params.identifier);
+
+    if (!activity?.stravaActivityId) {
+      return res.status(400).json({ error: 'Not a Strava-linked activity' });
+    }
+
+    const { fetchSegmentEfforts } = require('../services/stravaStreams');
+    const segmentEfforts = await fetchSegmentEfforts(accessToken, activity.stravaActivityId, 15);
+
+    activity.segmentEfforts = segmentEfforts;
+    activity.updatedAt = new Date();
+    await activity.save();
+
+    res.json({ success: true, segmentEfforts });
+  } catch (error) {
+    console.error('Segment efforts error:', error);
+    res.status(500).json({ error: 'Failed to fetch segment efforts' });
+  }
+});
+
 module.exports = router;
+module.exports.syncRecentActivitiesForUser = syncRecentActivitiesForUser;
+module.exports.generatePerformanceVector = generatePerformanceVector;
+module.exports.buildActivityUpdate = buildActivityUpdate;

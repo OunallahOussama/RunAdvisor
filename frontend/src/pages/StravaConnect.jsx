@@ -196,7 +196,7 @@ function StravaConnect() {
       const response = await stravaApi.syncRecentActivities(20);
       const syncedCount = response?.data?.syncedCount || 0;
       await loadPageData();
-      setStatus(`Synced ${syncedCount} recent Strava activities. Open Coach Review to see refreshed insights.`);
+      setStatus(`Synced ${syncedCount} recent Strava activities. Open Training review to see refreshed insights.`);
     } catch (error) {
       console.error('Error syncing Strava activities:', error);
       setStatus(error.response?.data?.message || 'Unable to sync Strava activities right now.');
@@ -360,7 +360,7 @@ function StravaConnect() {
                 </Button>
               )}
               <Button onClick={() => navigate('/recommendations')} startIcon={<CoachIcon size={16} />} variant="outlined">
-                Open Coach Review
+                Open training review
               </Button>
             </Stack>
           </CardContent>

@@ -5,6 +5,12 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { findSimilarActivities, generateRecommendations } = require('../services/mlService');
 const { buildCoachReview } = require('../services/trainingInsights');
+const {
+  findSimilarRunSegments,
+  matchActivitiesToProfile,
+  buildUserPreferenceVector
+} = require('../services/vectorSegments');
+const { buildTrainingProgress } = require('../services/progressService');
 
 const router = express.Router();
 
@@ -89,14 +95,29 @@ router.get('/coach-review', auth, async (req, res) => {
 
     const insights = buildCoachReview(recentActivities, user, {
       days,
-      raceDistance,
-      raceDate,
-      raceName
+      raceDistance: raceDistance || user.goalRaceDistanceKm,
+      raceDate: raceDate || user.goalRaceDate,
+      raceName: raceName || user.goalRaceName
     });
+
+    const similarSegments = findSimilarRunSegments(recentActivities, { limit: 6 });
+    const profileMatches = matchActivitiesToProfile(recentActivities, user, 5);
+    const trainingProgress = buildTrainingProgress(recentActivities, user);
+
+    if (user) {
+      user.preferenceVector = buildUserPreferenceVector(user);
+      user.updatedAt = new Date();
+      await user.save();
+    }
 
     res.json({
       success: true,
       ...insights,
+      vectorInsights: {
+        similarSegments,
+        profileMatches
+      },
+      trainingProgress,
       analyzedActivities: recentActivities.length,
       message: `Analyzed ${recentActivities.length} recent activities across the last ${days} day(s).`
     });

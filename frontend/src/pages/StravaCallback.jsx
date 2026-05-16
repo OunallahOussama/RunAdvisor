@@ -131,8 +131,9 @@ function StravaCallback() {
   }, [location.search, navigate, isAuthenticated, authLoading]);
 
   const handleSignIn = () => {
+    const returnTo = `${location.pathname}${location.search}`;
     loginWithRedirect({
-      appState: { returnTo: '/callback' }
+      appState: { returnTo: returnTo || '/callback' }
     });
   };
 

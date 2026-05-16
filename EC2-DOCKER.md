@@ -175,11 +175,26 @@ curl -I http://127.0.0.1/api/auth/me
 
 ### 6) Optional HTTPS with certbot
 
+**Amazon Linux 2023:** `sudo dnf -y install certbot python3-certbot-nginx`
+
+**Amazon Linux 2:** `yum` does not ship certbot. Use a venv:
+
 ```bash
-sudo dnf -y install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo yum install -y python3 augeas-libs
+sudo python3 -m venv /opt/certbot
+sudo /opt/certbot/bin/pip install --upgrade pip certbot certbot-nginx 'urllib3<2'
+sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
+certbot --version
+```
+
+Issue certificate (HTTP must work on port 80 first):
+
+```bash
+sudo certbot --nginx -d runadvisor.fit -d www.runadvisor.fit
 sudo certbot renew --dry-run
 ```
+
+After HTTPS works, set `https://runadvisor.fit` in `.env.ec2`, Auth0, and Strava, then rebuild the frontend image.
 
 ### Security group guidance
 

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { adminApi } from '../services/api';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -23,18 +24,47 @@ import {
   DashboardIcon,
   InstallIcon,
   RunAdvisorMark,
-  SyncIcon
+  SyncIcon,
+  TargetIcon
 } from './icons';
 
 const navigationItems = [
   { icon: DashboardIcon, label: 'Dashboard', to: '/dashboard' },
   { icon: ActivityIcon, label: 'Activities', to: '/activities' },
-  { icon: CoachIcon, label: 'Coach Review', to: '/recommendations' },
+  { icon: CoachIcon, label: 'Training', to: '/recommendations' },
+  { icon: TargetIcon, label: 'Profile', to: '/profile' },
   { icon: SyncIcon, label: 'Strava', to: '/strava-connect' }
+];
+
+const legalItems = [
+  { label: 'About', to: '/about' },
+  { label: 'Cookies', to: '/cookies' },
+  { label: 'Privacy', to: '/privacy' }
 ];
 
 function Navbar({ onLogout, user, canInstall, onInstall }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    adminApi.getMe()
+      .then((res) => {
+        if (!cancelled) {
+          setIsAdmin(Boolean(res.data.isAdmin));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setIsAdmin(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.sub]);
   const navigate = useNavigate();
   const location = useLocation();
   const muiTheme = useMuiTheme();
@@ -86,6 +116,21 @@ function Navbar({ onLogout, user, canInstall, onInstall }) {
             <ListItemText primary="Install app" />
           </ListItemButton>
         )}
+        {legalItems.map(({ label, to }) => (
+          <ListItemButton
+            key={to}
+            component={RouterLink}
+            selected={location.pathname === to}
+            to={to}
+          >
+            <ListItemText primary={label} inset sx={{ pl: 2 }} />
+          </ListItemButton>
+        ))}
+        {isAdmin && (
+          <ListItemButton component={RouterLink} selected={location.pathname === '/admin'} to="/admin">
+            <ListItemText primary="Admin" inset sx={{ pl: 2 }} />
+          </ListItemButton>
+        )}
       </List>
       <Divider />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1, py: 1 }}>
@@ -132,11 +177,6 @@ function Navbar({ onLogout, user, canInstall, onInstall }) {
             <Typography component="span" variant="h6" fontWeight={700}>
               RunAdvisor
             </Typography>
-            {isSmUp && (
-              <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                Mobile coach
-              </Typography>
-            )}
           </Box>
         </Box>
 
@@ -170,6 +210,11 @@ function Navbar({ onLogout, user, canInstall, onInstall }) {
             {canInstall && (
               <Button color="inherit" onClick={onInstall} startIcon={<InstallIcon size={18} />} variant="outlined">
                 Install app
+              </Button>
+            )}
+            {isAdmin && (
+              <Button color="inherit" component={RouterLink} to="/admin" variant="text">
+                Admin
               </Button>
             )}
             <ThemeToggleButton />

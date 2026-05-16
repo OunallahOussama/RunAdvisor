@@ -20,6 +20,8 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import ActivityRouteMap from '../components/ActivityRouteMap';
+import SimilarRunsPanel from '../components/SimilarRunsPanel';
+import ActivityStreamsChart from '../components/ActivityStreamsChart';
 import {
   ActivityIcon,
   ClockIcon,
@@ -149,6 +151,7 @@ function ActivityDetail() {
   const [loading, setLoading] = useState(true);
   const [stravaMessage, setStravaMessage] = useState('');
   const [error, setError] = useState('');
+  const [segmentEfforts, setSegmentEfforts] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +181,17 @@ function ActivityDetail() {
           const stravaRes = await stravaApi.getStravaActivityDetail(id);
           if (!cancelled) {
             setStravaDetail(stravaRes.data.detail);
+          }
+
+          try {
+            const segRes = await stravaApi.getActivitySegments(id);
+            if (!cancelled) {
+              setSegmentEfforts(segRes.data.segmentEfforts || []);
+            }
+          } catch {
+            if (!cancelled) {
+              setSegmentEfforts([]);
+            }
           }
         } catch (stravaErr) {
           if (cancelled) {
@@ -334,11 +348,31 @@ function ActivityDetail() {
             </CardContent>
           </Card>
 
+          {localActivity?._id && (
+            <SimilarRunsPanel activityId={localActivity._id} />
+          )}
+
           {detail && (
             <Card variant="outlined" sx={{ mb: 2 }}>
               <CardContent>
                 <ActivityRouteMap encodedPolyline={encoded} title="Map" />
+                <ActivityStreamsChart activityId={id} />
                 <SplitsElevationChart splits={detail.splits_metric} />
+                {segmentEfforts.length > 0 && (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+                      Segment efforts
+                    </Typography>
+                    <Stack spacing={0.5}>
+                      {segmentEfforts.map((seg) => (
+                        <Typography key={seg.id} variant="body2">
+                          {seg.name}
+                          {seg.prRank ? ` · PR #${seg.prRank}` : ''}
+                        </Typography>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
                 {(detail.kudos_count != null || detail.comment_count != null) && (
                   <Typography variant="caption" color="text.secondary" sx={{ mt: 2, display: 'block' }}>
                     {detail.kudos_count != null && `${detail.kudos_count} kudos`}

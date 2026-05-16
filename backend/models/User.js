@@ -26,6 +26,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: 'auth0'
   },
+  role: {
+    type: String,
+    enum: ['user', 'admin'],
+    default: 'user'
+  },
   stravaId: String,
   stravaAccessToken: String,
   stravaRefreshToken: String,
@@ -65,7 +70,12 @@ const userSchema = new mongoose.Schema({
   experience: { type: String, enum: ['beginner', 'intermediate', 'advanced'] },
   preferredDistance: Number, // km
   trainingGoals: [String], // 'endurance', 'speed', 'recovery', etc.
-  
+  goalPaceMinPerKm: Number,
+  weeklyTrainingLoadKm: Number,
+  goalRaceName: String,
+  goalRaceDate: Date,
+  goalRaceDistanceKm: Number,
+
   // Vector embeddings for preferences
   preferenceVector: [Number],
   
