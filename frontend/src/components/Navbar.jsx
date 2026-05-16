@@ -16,6 +16,7 @@ import { useTheme as useMuiTheme } from '@mui/material/styles';
 import MenuIcon from '@mui/icons-material/Menu';
 import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggleButton from './ThemeToggleButton';
+import StravaStatusIndicator from './StravaStatusIndicator';
 import {
   ActivityIcon,
   CoachIcon,
@@ -53,6 +54,9 @@ function Navbar({ onLogout, user, canInstall, onInstall }) {
         <Typography variant="subtitle2" color="text.secondary" noWrap>
           {displayName}
         </Typography>
+        <Box sx={{ mt: 1.5 }}>
+          <StravaStatusIndicator compact />
+        </Box>
       </Box>
       <Divider />
       <List>
@@ -144,6 +148,7 @@ function Navbar({ onLogout, user, canInstall, onInstall }) {
 
         {isSmUp && (
           <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+            <StravaStatusIndicator />
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200 }} noWrap>
               {displayName}
             </Typography>

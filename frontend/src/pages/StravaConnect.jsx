@@ -7,7 +7,6 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
-import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -21,6 +20,7 @@ import {
   TargetIcon,
   UploadIcon
 } from '../components/icons';
+import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
 
 const STRAVA_CACHE_KEY = 'strava-hub';
@@ -58,6 +58,7 @@ function readFileAsDataUrl(file) {
 function StravaConnect() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { refreshProfile } = useRunAdvisorProfile();
   const [status, setStatus] = useState('');
   const [profile, setProfile] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -101,7 +102,9 @@ function StravaConnect() {
         stravaApi.getTrainingPlans()
       ]);
 
-      setProfile(profileResponse.data.user);
+      const nextProfile = profileResponse.data.user;
+      setProfile(nextProfile);
+      refreshProfile(nextProfile);
       setPlans(plansResponse.data.plans || []);
       saveSnapshot(STRAVA_CACHE_KEY, {
         plans: plansResponse.data.plans || [],
@@ -129,7 +132,7 @@ function StravaConnect() {
     } finally {
       setLoading(false);
     }
-  }, [statusFromQuery]);
+  }, [refreshProfile, statusFromQuery]);
 
   useEffect(() => {
     loadPageData();
@@ -160,6 +163,7 @@ function StravaConnect() {
         setProfile(nextProfile);
 
         if (nextProfile?.stravaLastSyncAt && nextProfile.stravaLastSyncAt !== initialSyncAt) {
+          refreshProfile(nextProfile);
           setStatus('Background sync finished. Your recent Strava activities are in RunAdvisor.');
           window.clearInterval(intervalId);
         }
@@ -173,7 +177,7 @@ function StravaConnect() {
     }, 3000);
 
     return () => window.clearInterval(intervalId);
-  }, [location.search, profile?.stravaLastSyncAt]);
+  }, [location.search, profile?.stravaLastSyncAt, refreshProfile]);
 
   const handleStravaConnect = () => {
     if (!stravaClientId) {

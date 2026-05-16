@@ -20,6 +20,7 @@ import Navbar from './components/Navbar';
 import { OfflineIcon } from './components/icons';
 import { authApi, setAccessTokenGetter, setAccessTokenRefresher, setApiNotifier } from './services/api';
 import { ApiNotificationProvider, useApiNotification } from './context/ApiNotificationContext';
+import { RunAdvisorProfileProvider } from './context/RunAdvisorProfileContext';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import './App.css';
 
@@ -188,28 +189,29 @@ function AppContent() {
   }
 
   return (
-    <Router>
-      <Box className="App" sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        {isAuthenticated && (
-          <Navbar
-            canInstall={canInstall}
-            onInstall={promptToInstall}
-            onLogout={handleLogout}
-            user={user}
-          />
-        )}
-        <Container maxWidth="lg" sx={{ pt: isAuthenticated ? 2 : 0, pb: 4, flex: 1 }}>
-          <Stack spacing={2} sx={{ mb: 2 }}>
-            {!isOnline && (
-              <Alert icon={<OfflineIcon size={20} />} severity="warning">
-                Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when
-                available.
-              </Alert>
-            )}
-            {profileError && <Alert severity="error">{profileError}</Alert>}
-            {authError && <Alert severity="warning">Sign-in error: {authError}</Alert>}
-          </Stack>
-          <Routes>
+    <RunAdvisorProfileProvider enabled={isAuthenticated}>
+      <Router>
+        <Box className="App" sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+          {isAuthenticated && (
+            <Navbar
+              canInstall={canInstall}
+              onInstall={promptToInstall}
+              onLogout={handleLogout}
+              user={user}
+            />
+          )}
+          <Container maxWidth="lg" sx={{ pt: isAuthenticated ? 2 : 0, pb: 4, flex: 1 }}>
+            <Stack spacing={2} sx={{ mb: 2 }}>
+              {!isOnline && (
+                <Alert icon={<OfflineIcon size={20} />} severity="warning">
+                  Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when
+                  available.
+                </Alert>
+              )}
+              {profileError && <Alert severity="error">{profileError}</Alert>}
+              {authError && <Alert severity="warning">Sign-in error: {authError}</Alert>}
+            </Stack>
+            <Routes>
             <Route
               path="/login"
               element={
@@ -237,10 +239,11 @@ function AppContent() {
             <Route path="/strava-connect" element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} />
             <Route path="/callback" element={<StravaCallback />} />
             <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
-          </Routes>
-        </Container>
-      </Box>
-    </Router>
+            </Routes>
+          </Container>
+        </Box>
+      </Router>
+    </RunAdvisorProfileProvider>
   );
 }
 

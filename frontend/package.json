@@ -23,7 +23,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.36",
+    "postcss": "^8.5.14",
     "react-scripts": "5.0.1"
   },
   "scripts": {
@@ -36,6 +36,14 @@
     "extends": [
       "react-app"
     ]
+  },
+  "overrides": {
+    "@tootallnate/once": "^3.0.1",
+    "nth-check": "^2.1.1",
+    "resolve-url-loader": "^5.0.0",
+    "serialize-javascript": "^7.0.5",
+    "underscore": "^1.13.8",
+    "webpack-dev-server": "^5.2.4"
   },
   "browserslist": {
     "production": [
