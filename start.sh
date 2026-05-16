@@ -12,7 +12,11 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
+if docker compose version &> /dev/null; then
+    COMPOSE="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    COMPOSE="docker-compose"
+else
     echo "❌ Docker Compose is not installed. Please install Docker Compose first."
     exit 1
 fi
@@ -30,7 +34,7 @@ fi
 
 echo ""
 echo "🐳 Starting Docker services..."
-docker-compose up --build
+$COMPOSE up --build
 
 echo ""
 echo "✅ RunAdvisor is ready!"

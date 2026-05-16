@@ -39,6 +39,9 @@ services:
       PORT: 5000
     networks:
       - runadvisor-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - /app/node_modules

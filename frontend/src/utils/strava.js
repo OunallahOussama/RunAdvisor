@@ -104,9 +104,14 @@ export function extractReadableMessage(payload) {
 }
 
 export function getStravaConnectionErrorMessage(error) {
+  const message = error?.message || '';
+  if (/missing refresh token/i.test(message)) {
+    return 'Your sign-in session needs to be refreshed. Log out, sign in again, then retry Connect with Strava.';
+  }
+
   return (
     extractReadableMessage(error?.response?.data) ||
-    extractReadableMessage(error?.message) ||
+    extractReadableMessage(message) ||
     'Please verify your Strava settings and try again.'
   );
 }

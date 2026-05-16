@@ -76,10 +76,11 @@ root.render(
           clientId={auth0ClientId}
           cacheLocation="localstorage"
           useRefreshTokens
+          useRefreshTokensFallback
           authorizationParams={{
             redirect_uri: auth0CallbackUrl,
             audience: auth0Audience,
-            scope: 'openid profile email'
+            scope: 'openid profile email offline_access'
           }}
           onRedirectCallback={(appState) => {
             const returnTo = appState?.returnTo;

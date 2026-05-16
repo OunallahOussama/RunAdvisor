@@ -4,12 +4,24 @@ This setup keeps Nginx on host ports `80/443` and exposes the frontend container
 
 ### 1) Install Docker on Amazon Linux
 
+**Amazon Linux 2023** uses `dnf`. **Amazon Linux 2** uses `yum`:
+
 ```bash
-sudo dnf -y update
-sudo dnf -y install docker
+# Amazon Linux 2
+sudo yum -y install docker git nginx
 sudo systemctl enable --now docker
 sudo usermod -aG docker ec2-user
-newgrp docker
+# log out and back in, or: newgrp docker
+
+# Amazon Linux 2023
+# sudo dnf -y install docker git nginx
+```
+
+Or run the automated bootstrap from the repo root on EC2:
+
+```bash
+chmod +x scripts/ec2-bootstrap.sh
+./scripts/ec2-bootstrap.sh YOUR_PUBLIC_IP
 ```
 
 ### 2) Ensure Docker Compose is available
@@ -49,7 +61,15 @@ docker buildx inspect --bootstrap
 
 ```bash
 cp .env.ec2.example .env.ec2
-# edit .env.ec2 with production values
+# Replace YOUR_EC2_PUBLIC_IP (e.g. 13.222.164.158) and add Auth0/Strava secrets
+nano .env.ec2
+```
+
+From your dev machine (SSH key at `~/Downloads/runadvisor-access.pem`):
+
+```bash
+chmod +x scripts/ec2-provision-from-local.sh
+EC2_IP=13.222.164.158 ./scripts/ec2-provision-from-local.sh
 ```
 
 For Auth0, make sure your Auth0 application allows:
