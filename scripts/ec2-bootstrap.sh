@@ -22,10 +22,20 @@ else
   PKG="yum"
 fi
 
-echo "Installing Docker, Git, Nginx..."
-sudo "$PKG" -y install docker git nginx
+echo "Installing Docker and Git..."
+sudo "$PKG" -y install docker git
 sudo systemctl enable --now docker
 sudo usermod -aG docker "$USER" || true
+
+if ! command -v nginx &>/dev/null; then
+  echo "Installing Nginx (Amazon Linux Extras on AL2)..."
+  if command -v amazon-linux-extras &>/dev/null; then
+    sudo amazon-linux-extras install -y nginx1
+  else
+    sudo "$PKG" -y install nginx
+  fi
+fi
+sudo systemctl enable --now nginx
 
 if docker compose version &>/dev/null; then
   COMPOSE="docker compose"
