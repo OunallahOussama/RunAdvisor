@@ -4,7 +4,7 @@ set -euo pipefail
 
 EC2_IP="${1:-$(curl -sf http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo '')}"
 REPO_DIR="${REPO_DIR:-$HOME/RunAdvisor}"
-SERVER_NAME="${SERVER_NAME:-${EC2_IP:-_}}"
+SERVER_NAME="${SERVER_NAME:-runadvisor.fit}"
 
 echo "RunAdvisor EC2 bootstrap (Amazon Linux 2)"
 echo "  Repo: ${REPO_DIR}"
@@ -63,18 +63,14 @@ cd "$REPO_DIR"
 
 if [[ ! -f .env.ec2 ]]; then
   cp .env.ec2.example .env.ec2
-  if [[ -n "$EC2_IP" ]]; then
-    sed -i "s/YOUR_EC2_PUBLIC_IP/${EC2_IP}/g" .env.ec2
-  fi
   echo ""
-  echo "Created .env.ec2 — edit secrets before deploy:"
+  echo "Created .env.ec2 — edit secrets (URLs default to https://runadvisor.fit):"
   echo "  nano ${REPO_DIR}/.env.ec2"
   echo ""
 fi
 
 NGINX_CONF="/etc/nginx/conf.d/runadvisor.conf"
 sudo cp deploy/nginx/runadvisor.conf "$NGINX_CONF"
-sudo sed -i "s/RUNADVISOR_SERVER_NAME/${SERVER_NAME}/g" "$NGINX_CONF"
 sudo nginx -t
 sudo systemctl enable --now nginx
 sudo systemctl reload nginx

@@ -61,24 +61,20 @@ docker buildx inspect --bootstrap
 
 ```bash
 cp .env.ec2.example .env.ec2
-# Replace YOUR_EC2_PUBLIC_IP (e.g. 13.222.164.158) and add Auth0/Strava secrets
+# Set secrets and confirm URLs use https://runadvisor.fit (see .env.ec2.example)
 nano .env.ec2
 ```
 
-From your dev machine (SSH key at `~/Downloads/runadvisor-access.pem`):
+For Auth0, allow your public origin:
 
-```bash
-chmod +x scripts/ec2-provision-from-local.sh
-EC2_IP=13.222.164.158 ./scripts/ec2-provision-from-local.sh
-```
+- Callback URL: `https://runadvisor.fit`
+- Logout URL: `https://runadvisor.fit`
+- Web Origin: `https://runadvisor.fit`
+- (Optional) same three for `https://www.runadvisor.fit` if you use www
 
-For Auth0, make sure your Auth0 application allows:
+Strava: Authorization Callback Domain `runadvisor.fit`, redirect URI `https://runadvisor.fit/callback`.
 
-- Callback URL: `http://YOUR_EC2_PUBLIC_IP`
-- Logout URL: `http://YOUR_EC2_PUBLIC_IP`
-- Web Origin: `http://YOUR_EC2_PUBLIC_IP`
-
-If you later put Nginx behind a real domain and HTTPS, switch those Auth0 URLs to your final public origin.
+Before HTTPS is ready, use `http://runadvisor.fit` in `.env.ec2` and Auth0/Strava, then switch to `https://` and rebuild the frontend after certbot.
 
 Use `--env-file` on every compose command:
 
@@ -162,36 +158,10 @@ docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f --tail=200 frontend
 ```
 
-Create the host nginx config if missing:
+Install Nginx site from the repo (already set for `runadvisor.fit`):
 
 ```bash
-sudo tee /etc/nginx/conf.d/runadvisor.conf > /dev/null <<'EOF'
-server {
-    listen 80;
-    server_name runadvisor.fit www.runadvisor.fit;
-
-    location /api/ {
-        proxy_pass http://127.0.0.1:5000/api/;
-        proxy_http_version 1.1;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+sudo cp deploy/nginx/runadvisor.conf /etc/nginx/conf.d/runadvisor.conf
 ```
 
 Reload and validate local path:
