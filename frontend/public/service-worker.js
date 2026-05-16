@@ -1,4 +1,4 @@
-const CACHE_NAME = 'runadvisor-shell-v3';
+const CACHE_NAME = 'runadvisor-shell-v4';
 const APP_SHELL_URL = '/';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
@@ -61,7 +61,10 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) {
     if (request.mode === 'navigate') {
       event.respondWith(
-        fetch(request).catch(() => caches.match(OFFLINE_URL))
+        fetch(request).catch(async () => {
+          const offline = await caches.match(OFFLINE_URL);
+          return offline;
+        })
       );
     }
 
@@ -85,7 +88,16 @@ self.addEventListener('fetch', (event) => {
         .then((response) => updateCache(request, response))
         .catch(async () => {
           const cachedPage = await caches.match(request);
-          return cachedPage || caches.match(APP_SHELL_URL) || caches.match(OFFLINE_URL);
+          if (cachedPage) {
+            return cachedPage;
+          }
+
+          const shell = await caches.match(APP_SHELL_URL);
+          if (shell) {
+            return shell;
+          }
+
+          return caches.match(OFFLINE_URL);
         })
     );
     return;
