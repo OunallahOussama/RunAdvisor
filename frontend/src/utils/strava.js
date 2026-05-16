@@ -2,7 +2,11 @@ const STRAVA_OAUTH_CODE_KEY = 'runadvisor.strava.oauth.code';
 const STRAVA_OAUTH_REDIRECT_KEY = 'runadvisor.strava.oauth.redirectUri';
 
 export function getStravaRedirectUri() {
-  return process.env.REACT_APP_STRAVA_REDIRECT_URI || `${window.location.origin}/callback`;
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}/callback`;
+  }
+
+  return process.env.REACT_APP_STRAVA_REDIRECT_URI || 'http://localhost:3000/callback';
 }
 
 /**

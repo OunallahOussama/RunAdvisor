@@ -75,7 +75,10 @@ Auth0 Dashboard → APIs → your API (`https://runadvisor-api`) → enable the 
 
 Auth0 Dashboard → Applications → SPA → Settings → Application Type must be **Single Page Application**.
 
-Strava: Authorization Callback Domain `runadvisor.fit`, redirect URI `https://runadvisor.fit/callback`.
+Strava ([API settings](https://www.strava.com/settings/api)):
+
+- **Authorization Callback Domain:** `runadvisor.fit` (domain only, no `https://`)
+- After OAuth, Strava redirects to `{your-origin}/callback` (e.g. `http://runadvisor.fit/callback` or `https://runadvisor.fit/callback` once HTTPS works). The app uses the browser origin automatically.
 
 Before HTTPS is ready, use `http://runadvisor.fit` in `.env.ec2` and Auth0/Strava, then switch to `https://` and rebuild the frontend after certbot.
 
