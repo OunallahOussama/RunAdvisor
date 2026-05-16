@@ -1,0 +1,32 @@
+# Secrets and local environment (never commit)
+.env
+.env.ec2
+.env.local
+.env.*.local
+backend/.env
+
+# Keep templates trackable
+!.env.example
+!.env.ec2.example
+!backend/.env.example
+
+# Dependencies and build output
+node_modules/
+frontend/node_modules/
+frontend/build/
+dist/
+coverage/
+
+# Keys and certs
+*.pem
+*.key
+*.p12
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.log
+npm-debug.log*
