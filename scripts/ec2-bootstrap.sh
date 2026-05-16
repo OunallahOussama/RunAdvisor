@@ -49,6 +49,10 @@ else
   COMPOSE="docker-compose"
 fi
 
+# Older hosts may lack buildx 0.17+ required by default compose builds.
+export DOCKER_BUILDKIT="${DOCKER_BUILDKIT:-0}"
+export COMPOSE_DOCKER_CLI_BUILD="${COMPOSE_DOCKER_CLI_BUILD:-0}"
+
 if [[ ! -d "$REPO_DIR" ]]; then
   echo "Clone the repo into ${REPO_DIR} first, e.g.:"
   echo "  git clone https://github.com/OunallahOussama/RunAdvisor.git ${REPO_DIR}"

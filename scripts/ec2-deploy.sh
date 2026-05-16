@@ -22,6 +22,8 @@ echo "Pulling latest code..."
 git pull origin main
 
 echo "Building and starting stack..."
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
 "${COMPOSE[@]}" --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build
 
 echo ""
