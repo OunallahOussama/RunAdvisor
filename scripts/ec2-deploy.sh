@@ -19,7 +19,8 @@ else
 fi
 
 echo "Pulling latest code..."
-git pull origin main
+git fetch origin main
+git reset --hard origin/main
 
 echo "Ensuring swap (helps small instances)..."
 bash scripts/ec2-add-swap.sh 2>/dev/null || true
