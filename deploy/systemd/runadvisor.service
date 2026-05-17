@@ -1,0 +1,19 @@
+[Unit]
+Description=RunAdvisor (Docker Compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/ec2-user/RunAdvisor
+Environment=DOCKER_BUILDKIT=0
+Environment=COMPOSE_DOCKER_CLI_BUILD=0
+ExecStart=/usr/local/bin/docker-compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d
+ExecStop=/usr/local/bin/docker-compose --env-file .env.ec2 -f docker-compose.ec2.yml down
+User=ec2-user
+Group=docker
+
+[Install]
+WantedBy=multi-user.target

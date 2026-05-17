@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { authApi, stravaApi } from '../services/api';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getStravaRedirectUri } from '../utils/strava';
+import { buildStravaAuthorizeUrl } from '../utils/stravaScopes';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -70,7 +70,6 @@ function StravaConnect() {
   const [offlineMessage, setOfflineMessage] = useState('');
 
   const stravaClientId = process.env.REACT_APP_STRAVA_CLIENT_ID || '';
-  const stravaRedirectUri = getStravaRedirectUri();
   const isStravaConnected = Boolean(profile?.stravaId);
   const statusFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -92,7 +91,7 @@ function StravaConnect() {
     return '';
   }, [location.search]);
 
-  const STRAVA_AUTH_URL = `https://www.strava.com/oauth/authorize?client_id=${stravaClientId}&response_type=code&redirect_uri=${encodeURIComponent(stravaRedirectUri)}&scope=activity:read_all`;
+  const STRAVA_AUTH_URL = buildStravaAuthorizeUrl(stravaClientId);
 
   const loadPageData = useCallback(async () => {
     try {
@@ -114,8 +113,8 @@ function StravaConnect() {
 
       if (!statusFromQuery) {
         setStatus(profileResponse.data.user.stravaId
-          ? 'Strava is connected. You can sync fresh activities or manage your in-app training plans here.'
-          : 'Connect Strava to sync recent activities, then review your training and upload supporting plans in this workspace.');
+          ? 'Strava is connected (read + upload). Sync activities from Strava or post manual runs from the Activities page.'
+          : 'Connect Strava to sync activities and upload manual runs. RunAdvisor requests read and write access to your activities.');
       }
     } catch (error) {
       console.error('Error loading Strava page data:', error);

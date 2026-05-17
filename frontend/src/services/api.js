@@ -110,7 +110,10 @@ export const activitiesApi = {
   getSimilarActivities: (id) => api.get(`/activities/${id}/similar`),
   getWeeklySummary: () => api.get('/activities/summary/weekly'),
   createActivity: (activity) => api.post('/activities', activity),
-  deleteActivity: (id) => api.delete(`/activities/${id}`)
+  deleteActivity: (id, { deleteFromStrava = true } = {}) =>
+    api.delete(`/activities/${id}`, {
+      params: { deleteFromStrava }
+    })
 };
 
 // Strava endpoints

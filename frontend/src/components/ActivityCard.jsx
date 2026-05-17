@@ -19,6 +19,7 @@ import {
   RecoveryIcon,
   TrailIcon
 } from './icons';
+import { getVisibilityChipColor, getVisibilityLabel } from '../utils/activityVisibility';
 
 function getActivityIcon(activityType = '') {
   return activityType.toLowerCase().includes('trail') ? TrailIcon : ActivityIcon;
@@ -98,6 +99,12 @@ function ActivityCard({ activity, onDelete }) {
           </Stack>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip label={activity.type?.toUpperCase()} size="small" variant="outlined" />
+            <Chip
+              color={getVisibilityChipColor(activity.visibility)}
+              label={getVisibilityLabel(activity.visibility)}
+              size="small"
+              variant="outlined"
+            />
             <Chip color="primary" label={effortLabel} size="small" variant="filled" />
           </Stack>
         </Stack>
@@ -129,7 +136,7 @@ function ActivityCard({ activity, onDelete }) {
           <Button variant="outlined" onClick={() => setExpanded((prev) => !prev)} type="button">
             {expanded ? 'Hide details' : 'View details'}
           </Button>
-          <Button color="error" variant="outlined" onClick={() => onDelete(activity._id)} type="button">
+          <Button color="error" variant="outlined" onClick={() => onDelete(activity)} type="button">
             Delete
           </Button>
         </Stack>

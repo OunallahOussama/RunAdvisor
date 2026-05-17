@@ -20,8 +20,10 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import ActivityRouteMap from '../components/ActivityRouteMap';
+import DeleteActivityDialog from '../components/DeleteActivityDialog';
 import SimilarRunsPanel from '../components/SimilarRunsPanel';
 import ActivityStreamsChart from '../components/ActivityStreamsChart';
+import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 import {
   ActivityIcon,
   ClockIcon,
@@ -31,6 +33,7 @@ import {
   PaceIcon
 } from '../components/icons';
 import { activitiesApi, stravaApi } from '../services/api';
+import { getVisibilityChipColor, getVisibilityLabel } from '../utils/activityVisibility';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -143,15 +146,29 @@ function SplitsElevationChart({ splits }) {
   );
 }
 
+function getApiErrorMessage(error, fallback) {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    fallback
+  );
+}
+
 function ActivityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { profile } = useRunAdvisorProfile();
+  const stravaConnected = Boolean(profile?.stravaId);
   const [localActivity, setLocalActivity] = useState(null);
   const [stravaDetail, setStravaDetail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [stravaMessage, setStravaMessage] = useState('');
   const [error, setError] = useState('');
   const [segmentEfforts, setSegmentEfforts] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingActivity, setDeletingActivity] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -233,8 +250,54 @@ function ActivityDetail() {
   const startDate = detail?.start_date || localActivity?.date;
   const dateLabel = startDate ? new Date(startDate).toLocaleString() : '';
 
+  const handleConfirmDelete = async ({ deleteFromStrava }) => {
+    if (!localActivity?._id) {
+      return;
+    }
+
+    setDeletingActivity(true);
+    setDeleteMessage(null);
+
+    try {
+      const response = await activitiesApi.deleteActivity(localActivity._id, { deleteFromStrava });
+      const strava = response.data?.strava;
+      const succeededOnStrava = !deleteFromStrava || !localActivity.stravaActivityId || strava?.deleted;
+
+      navigate('/activities', {
+        replace: true,
+        state: {
+          deleteAlert: {
+            severity: succeededOnStrava ? 'success' : 'warning',
+            message: response.data?.message || 'Activity deleted.'
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      setDeleteMessage({
+        severity: 'error',
+        text: getApiErrorMessage(error, 'Unable to delete this activity right now.')
+      });
+    } finally {
+      setDeletingActivity(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
   return (
     <Box component="main">
+      <DeleteActivityDialog
+        activity={localActivity}
+        deleting={deletingActivity}
+        onClose={() => {
+          if (!deletingActivity) {
+            setDeleteDialogOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        open={deleteDialogOpen}
+        stravaConnected={stravaConnected}
+      />
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
         <Button component={RouterLink} to="/activities" variant="text" size="small">
           Back to run log
@@ -244,6 +307,12 @@ function ActivityDetail() {
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
+        </Alert>
+      )}
+
+      {deleteMessage && (
+        <Alert severity={deleteMessage.severity} sx={{ mb: 2 }} onClose={() => setDeleteMessage(null)}>
+          {deleteMessage.text}
         </Alert>
       )}
 
@@ -279,6 +348,14 @@ function ActivityDetail() {
                 </Box>
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   {displayType && <Chip size="small" label={String(displayType)} variant="outlined" />}
+                  {localActivity?.visibility && (
+                    <Chip
+                      color={getVisibilityChipColor(localActivity.visibility)}
+                      label={getVisibilityLabel(localActivity.visibility)}
+                      size="small"
+                      variant="outlined"
+                    />
+                  )}
                   {detail?.device_name && <Chip size="small" label={detail.device_name} variant="outlined" />}
                 </Stack>
               </Stack>
@@ -384,9 +461,12 @@ function ActivityDetail() {
             </Card>
           )}
 
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Button variant="outlined" onClick={() => navigate('/activities')}>
               Close
+            </Button>
+            <Button color="error" variant="outlined" onClick={() => setDeleteDialogOpen(true)}>
+              Delete activity
             </Button>
           </Stack>
         </>

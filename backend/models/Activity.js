@@ -62,6 +62,14 @@ const activitySchema = new mongoose.Schema({
   },
   
   notes: String,
+
+  // Strava-aligned: everyone (public), followers_only, only_me (private)
+  visibility: {
+    type: String,
+    enum: ['everyone', 'followers_only', 'only_me'],
+    default: 'everyone'
+  },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

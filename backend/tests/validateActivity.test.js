@@ -60,4 +60,35 @@ describe('validateCreateActivity', () => {
     expect(res.statusCode).toBe(400);
     expect(res.body.message).toMatch(/type/i);
   });
+
+  test('accepts Strava-style visibility values', () => {
+    const { req, nextCalled } = runValidator({ ...validBody, visibility: 'only_me' });
+
+    expect(nextCalled).toBe(true);
+    expect(req.validatedActivity.visibility).toBe('only_me');
+  });
+
+  test('accepts public and private aliases', () => {
+    const publicResult = runValidator({ ...validBody, visibility: 'public' });
+    const privateResult = runValidator({ ...validBody, visibility: 'private' });
+
+    expect(publicResult.req.validatedActivity.visibility).toBe('everyone');
+    expect(privateResult.req.validatedActivity.visibility).toBe('only_me');
+  });
+
+  test('rejects unknown visibility', () => {
+    const { res, nextCalled } = runValidator({ ...validBody, visibility: 'secret' });
+
+    expect(nextCalled).toBe(false);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.message).toMatch(/visibility/i);
+  });
+
+  test('accepts uploadToStrava flag', () => {
+    const enabled = runValidator({ ...validBody, uploadToStrava: true });
+    const disabled = runValidator({ ...validBody, uploadToStrava: false });
+
+    expect(enabled.req.validatedActivity.uploadToStrava).toBe(true);
+    expect(disabled.req.validatedActivity.uploadToStrava).toBe(false);
+  });
 });

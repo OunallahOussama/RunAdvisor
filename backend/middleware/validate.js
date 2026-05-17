@@ -54,6 +54,8 @@ function validateStravaAuthenticate(req, res, next) {
   return next();
 }
 
+const { VISIBILITY_VALUES, normalizeVisibility } = require('../utils/activityVisibility');
+
 const ACTIVITY_TYPES = new Set([
   'run',
   'outdoor run',
@@ -136,6 +138,34 @@ function validateCreateActivity(req, res, next) {
     return validationError(res, avgCadenceResult.message);
   }
 
+  let visibility = 'everyone';
+
+  if (req.body?.visibility != null && req.body.visibility !== '') {
+    const candidate = normalizeVisibility(req.body.visibility, '');
+
+    if (!VISIBILITY_VALUES.includes(candidate)) {
+      return validationError(res, 'visibility must be everyone, followers_only, or only_me.');
+    }
+
+    visibility = candidate;
+  }
+
+  let uploadToStrava = true;
+
+  if (req.body?.uploadToStrava != null && req.body.uploadToStrava !== '') {
+    const raw = req.body.uploadToStrava;
+
+    if (typeof raw === 'boolean') {
+      uploadToStrava = raw;
+    } else if (raw === 'true' || raw === '1' || raw === 1) {
+      uploadToStrava = true;
+    } else if (raw === 'false' || raw === '0' || raw === 0) {
+      uploadToStrava = false;
+    } else {
+      return validationError(res, 'uploadToStrava must be true or false.');
+    }
+  }
+
   let notes = null;
 
   if (req.body?.notes != null && req.body.notes !== '') {
@@ -156,7 +186,9 @@ function validateCreateActivity(req, res, next) {
     avgHeartRate: avgHeartRateResult.value,
     maxHeartRate: maxHeartRateResult.value,
     avgCadence: avgCadenceResult.value,
-    notes
+    notes,
+    visibility,
+    uploadToStrava
   };
 
   return next();

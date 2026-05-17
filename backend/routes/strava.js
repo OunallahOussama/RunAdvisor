@@ -181,6 +181,8 @@ function scheduleBackgroundStravaSync(userId, limit = 20) {
   });
 }
 
+const { visibilityFromStravaActivity } = require('../utils/activityVisibility');
+
 function buildActivityUpdate(userId, activity) {
   const normalizedType = normalizeStravaType(activity.type);
 
@@ -207,7 +209,8 @@ function buildActivityUpdate(userId, activity) {
     date: new Date(activity.start_date),
     polyline: activity.map?.summary_polyline || activity.map?.polyline,
     performanceVector: generatePerformanceVector(activity),
-    notes: activity.description
+    notes: activity.description,
+    visibility: visibilityFromStravaActivity(activity)
   };
 
   update.semanticVector = buildSemanticVector(update);

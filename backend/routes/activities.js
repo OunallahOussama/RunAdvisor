@@ -2,6 +2,12 @@ const express = require('express');
 const Activity = require('../models/Activity');
 const auth = require('../middleware/auth');
 const { validateCreateActivity } = require('../middleware/validate');
+const { prepareUserForStravaApi } = require('../utils/stravaCredentials');
+const {
+  mapStravaUploadError,
+  uploadActivityToStrava
+} = require('../services/stravaCreateActivity');
+const { deleteActivityFromStrava } = require('../services/stravaDeleteActivity');
 
 const router = express.Router();
 
@@ -189,7 +195,9 @@ router.post('/', auth, validateCreateActivity, async (req, res) => {
       avgHeartRate,
       maxHeartRate,
       avgCadence,
-      notes
+      notes,
+      visibility,
+      uploadToStrava
     } = req.validatedActivity;
 
     const distanceMeters = distanceKm * 1000;
@@ -209,6 +217,7 @@ router.post('/', auth, validateCreateActivity, async (req, res) => {
       avgCadence,
       date,
       notes,
+      visibility,
       performanceVector: [
         distanceKm / 10,
         durationSeconds / 3600,
@@ -220,8 +229,43 @@ router.post('/', auth, validateCreateActivity, async (req, res) => {
     });
     
     await activity.save();
-    
-    res.json({ success: true, activity });
+
+    let strava = { posted: false, skipped: true };
+
+    if (uploadToStrava) {
+      try {
+        const { accessToken } = await prepareUserForStravaApi(req.userId);
+        strava = await uploadActivityToStrava(accessToken, activity);
+        activity.stravaActivityId = String(strava.activityId);
+        await activity.save();
+      } catch (error) {
+        if (error.statusCode === 400) {
+          strava = {
+            posted: false,
+            notConnected: true,
+            message: error.message || 'Connect Strava before uploading activities.'
+          };
+        } else {
+          console.error('Strava upload error:', error.response?.data || error.message || error);
+          strava = mapStravaUploadError(error);
+        }
+      }
+    } else {
+      strava = {
+        posted: false,
+        skipped: true,
+        message: 'Saved in RunAdvisor only (Strava upload disabled).'
+      };
+    }
+
+    res.json({
+      success: true,
+      activity,
+      strava,
+      message: strava.posted
+        ? 'Activity saved and posted to Strava.'
+        : 'Activity saved in RunAdvisor.'
+    });
   } catch (error) {
     console.error('Activity creation error:', error);
     res.status(500).json({ error: 'Failed to create activity' });
@@ -235,18 +279,58 @@ router.post('/', auth, validateCreateActivity, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const activity = await Activity.findById(req.params.id);
-    
+    const deleteFromStrava = req.query.deleteFromStrava !== 'false';
+
     if (!activity) {
       return res.status(404).json({ error: 'Activity not found' });
     }
-    
+
     if (activity.userId.toString() !== req.userId.toString()) {
       return res.status(403).json({ error: 'Not authorized' });
     }
-    
+
+    let strava = { deleted: false, skipped: true };
+
+    if (activity.stravaActivityId && deleteFromStrava) {
+      try {
+        const { accessToken } = await prepareUserForStravaApi(req.userId);
+        strava = await deleteActivityFromStrava(accessToken, activity.stravaActivityId);
+      } catch (error) {
+        if (error.statusCode === 400) {
+          strava = {
+            deleted: false,
+            notConnected: true,
+            message: error.message || 'Connect Strava before deleting activities on Strava.'
+          };
+        } else {
+          console.error('Strava delete error:', error.response?.data || error.message || error);
+          strava = {
+            deleted: false,
+            message: error.message || 'Failed to delete activity on Strava.'
+          };
+        }
+      }
+    } else if (activity.stravaActivityId && !deleteFromStrava) {
+      strava = {
+        deleted: false,
+        skipped: true,
+        message: 'Removed from RunAdvisor only. The activity may still appear on Strava.'
+      };
+    }
+
     await Activity.deleteOne({ _id: req.params.id });
-    
-    res.json({ success: true, message: 'Activity deleted' });
+
+    const message = strava.deleted
+      ? 'Activity deleted from RunAdvisor and Strava.'
+      : activity.stravaActivityId && deleteFromStrava && !strava.deleted
+        ? 'Activity removed from RunAdvisor. Strava deletion did not complete.'
+        : 'Activity removed from RunAdvisor.';
+
+    res.json({
+      success: true,
+      message,
+      strava
+    });
   } catch (error) {
     console.error('Activity deletion error:', error);
     res.status(500).json({ error: 'Failed to delete activity' });
