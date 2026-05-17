@@ -68,8 +68,10 @@ nano .env.ec2
 For Auth0 (Application → Settings), add **every** URL users may use (http and https until certbot is done):
 
 - Allowed Callback URLs: `http://runadvisor.fit`, `https://runadvisor.fit`, `http://www.runadvisor.fit`, `https://www.runadvisor.fit`, `http://localhost:3000`
-- Allowed Logout URLs: same list
-- Allowed Web Origins: same list
+- Allowed Logout URLs: the list above **plus** `https://runadvisor.fit/login`, `https://www.runadvisor.fit/login` (the app signs out to `/login`)
+- Allowed Web Origins: same as callback URLs
+
+If logout shows Auth0 “misconfiguration”, the `returnTo` URL is missing from **Allowed Logout URLs** for application `AUTH0_CLIENT_ID`.
 
 Auth0 Dashboard → APIs → your API (`https://runadvisor-api`) → enable the SPA application.
 

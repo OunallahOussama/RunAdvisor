@@ -33,6 +33,7 @@ import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import TrainingSyncManager from './components/TrainingSyncManager';
 import AuthInAppBrowserNotice from './components/AuthInAppBrowserNotice';
 import { getGoogleAuthRestrictionMessage, isGoogleDisallowedUserAgentError, isRestrictedAuthBrowser } from './utils/authBrowser';
+import { getAuth0LogoutReturnUrl } from './utils/auth0Urls';
 import './App.css';
 
 function LoadingScreen({ message }) {
@@ -196,7 +197,7 @@ function AppContent() {
     setAccessTokenGetter(null);
     logout({
       logoutParams: {
-        returnTo: window.location.origin
+        returnTo: getAuth0LogoutReturnUrl()
       }
     });
   };
