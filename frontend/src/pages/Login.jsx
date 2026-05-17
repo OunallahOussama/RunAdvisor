@@ -46,9 +46,7 @@ function Login() {
           <Typography variant="body2" color="text.secondary" textAlign="center">
             Continue with your Google account to access RunAdvisor.
           </Typography>
-          {restricted && (
-            <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} sx={{ width: 1 }} />
-          )}
+          {restricted && <AuthInAppBrowserNotice loginPath="/login" />}
           <List dense disablePadding sx={{ width: 1 }}>
             <ListItem sx={{ border: 1, borderColor: 'divider', borderRadius: 2, mb: 1, bgcolor: 'action.hover' }}>
               <ListItemIcon sx={{ minWidth: 36 }}>

@@ -17,7 +17,7 @@ import {
   readStravaOAuthCode,
   readStravaOAuthRedirectUri
 } from '../utils/strava';
-import SecureBrowserAuthNotice from '../components/SecureBrowserAuthNotice';
+import AuthInAppBrowserNotice from '../components/AuthInAppBrowserNotice';
 import { useGoogleAuthLogin } from '../hooks/useGoogleAuthLogin';
 
 /**
@@ -54,7 +54,7 @@ function StravaCallback() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, isLoading: authLoading } = useAuth0();
-  const { restricted, openSignInInSystemBrowser, startGoogleLogin } = useGoogleAuthLogin({ signInPath: '/login' });
+  const { restricted, startGoogleLogin } = useGoogleAuthLogin({ signInPath: '/login' });
   const [status, setStatus] = useState('Connecting to Strava…');
   const [failed, setFailed] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -152,9 +152,7 @@ function StravaCallback() {
             <Typography variant="body1" color="text.secondary">
               {status}
             </Typography>
-            {needsSignIn && restricted && (
-              <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} sx={{ width: 1 }} />
-            )}
+            {needsSignIn && restricted && <AuthInAppBrowserNotice loginPath="/login" />}
             {needsSignIn && (
               <Button variant="contained" onClick={handleSignIn}>
                 {restricted ? 'Open sign-in in browser' : 'Sign in to continue'}

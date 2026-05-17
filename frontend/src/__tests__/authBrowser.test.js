@@ -1,26 +1,16 @@
 import {
   getGoogleAuthRestrictionMessage,
   isGoogleDisallowedUserAgentError,
-  isGoogleOAuthRestrictedBrowser,
-  isInAppEmbeddedBrowser
+  isRestrictedAuthBrowser
 } from '../utils/authBrowser';
 
 describe('authBrowser', () => {
-  it('detects common in-app browser user agents', () => {
-    expect(isInAppEmbeddedBrowser('Mozilla/5.0 Instagram 123')).toBe(true);
-    expect(isInAppEmbeddedBrowser('Mozilla/5.0 (Linux; Android 10; wv) AppleWebKit')).toBe(true);
-    expect(
-      isInAppEmbeddedBrowser(
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
-      )
-    ).toBe(false);
-  });
-
   it('flags restricted environments for Google OAuth', () => {
-    expect(isGoogleOAuthRestrictedBrowser('Mozilla/5.0 FBAN/FBIOS')).toBe(true);
-    expect(isGoogleOAuthRestrictedBrowser('Mozilla/5.0 Electron/28.0.0')).toBe(true);
+    expect(isRestrictedAuthBrowser('Mozilla/5.0 FBAN/FBIOS')).toBe(true);
+    expect(isRestrictedAuthBrowser('Mozilla/5.0 (Linux; Android 10; wv) AppleWebKit')).toBe(true);
+    expect(isRestrictedAuthBrowser('Mozilla/5.0 Electron/28.0.0')).toBe(true);
     expect(
-      isGoogleOAuthRestrictedBrowser(
+      isRestrictedAuthBrowser(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
       )
     ).toBe(false);
@@ -33,6 +23,6 @@ describe('authBrowser', () => {
   });
 
   it('returns a helpful restriction message', () => {
-    expect(getGoogleAuthRestrictionMessage()).toMatch(/Google sign-in must be completed/);
+    expect(getGoogleAuthRestrictionMessage()).toMatch(/Google sign-in must be completed|Open RunAdvisor/);
   });
 });

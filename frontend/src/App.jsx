@@ -31,9 +31,8 @@ import { ApiNotificationProvider, useApiNotification } from './context/ApiNotifi
 import { RunAdvisorProfileProvider } from './context/RunAdvisorProfileContext';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import TrainingSyncManager from './components/TrainingSyncManager';
-import SecureBrowserAuthNotice from './components/SecureBrowserAuthNotice';
-import { useGoogleAuthLogin } from './hooks/useGoogleAuthLogin';
-import { getGoogleAuthRestrictionMessage, isGoogleDisallowedUserAgentError } from './utils/authBrowser';
+import AuthInAppBrowserNotice from './components/AuthInAppBrowserNotice';
+import { getGoogleAuthRestrictionMessage, isGoogleDisallowedUserAgentError, isRestrictedAuthBrowser } from './utils/authBrowser';
 import './App.css';
 
 function LoadingScreen({ message }) {
@@ -66,7 +65,7 @@ function AppContent() {
     logout,
     user
   } = useAuth0();
-  const { restricted: authBrowserRestricted, openSignInInSystemBrowser } = useGoogleAuthLogin();
+  const authBrowserRestricted = isRestrictedAuthBrowser();
   const { showNotification } = useApiNotification();
   const [profileError, setProfileError] = useState('');
   const [profileSyncing, setProfileSyncing] = useState(false);
@@ -232,18 +231,11 @@ function AppContent() {
                 </Alert>
               )}
               {profileError && <Alert severity="error">{profileError}</Alert>}
-              {authError && (
-                isGoogleDisallowedUserAgentError(authError) || authBrowserRestricted ? (
-                  <SecureBrowserAuthNotice
-                    onOpenInBrowser={openSignInInSystemBrowser}
-                    severity="warning"
-                  />
-                ) : (
-                  <Alert severity="warning">Sign-in error: {authError}</Alert>
-                )
+              {authError && !isGoogleDisallowedUserAgentError(authError) && (
+                <Alert severity="warning">Sign-in error: {authError}</Alert>
               )}
-              {!authError && authBrowserRestricted && !isAuthenticated && (
-                <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} />
+              {(isGoogleDisallowedUserAgentError(authError) || authBrowserRestricted) && !isAuthenticated && (
+                <AuthInAppBrowserNotice loginPath="/login" />
               )}
             </Stack>
             <Routes>
