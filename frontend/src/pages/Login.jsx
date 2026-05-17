@@ -15,8 +15,15 @@ import GoogleIcon from '@mui/icons-material/Google';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import { CoachIcon, RunAdvisorMark, TargetIcon, TrendIcon } from '../components/icons';
 import AuthLegalNotice from '../components/AuthLegalNotice';
+import AuthInAppBrowserNotice from '../components/AuthInAppBrowserNotice';
+import { useGoogleAuthLogin } from '../hooks/useGoogleAuthLogin';
 
-function Login({ onGoogleLogin }) {
+function Login() {
+  const { restricted, startGoogleLogin } = useGoogleAuthLogin({ signInPath: '/login' });
+
+  const handleGoogleLogin = () => {
+    startGoogleLogin({ appState: { returnTo: '/dashboard' } });
+  };
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
     <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
@@ -39,6 +46,9 @@ function Login({ onGoogleLogin }) {
           <Typography variant="body2" color="text.secondary" textAlign="center">
             Continue with your Google account to access RunAdvisor.
           </Typography>
+          {restricted && (
+            <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} sx={{ width: 1 }} />
+          )}
           <List dense disablePadding sx={{ width: 1 }}>
             <ListItem sx={{ border: 1, borderColor: 'divider', borderRadius: 2, mb: 1, bgcolor: 'action.hover' }}>
               <ListItemIcon sx={{ minWidth: 36 }}>
@@ -59,8 +69,14 @@ function Login({ onGoogleLogin }) {
               <ListItemText primary="Install on your phone for quick access" />
             </ListItem>
           </List>
-          <Button fullWidth size="large" variant="contained" startIcon={<GoogleIcon />} onClick={onGoogleLogin}>
-            Continue with Google
+          <Button
+            fullWidth
+            size="large"
+            variant="contained"
+            startIcon={<GoogleIcon />}
+            onClick={handleGoogleLogin}
+          >
+            {restricted ? 'Open Google sign-in in browser' : 'Continue with Google'}
           </Button>
           <Divider sx={{ width: 1 }} />
           <Typography variant="body2" color="text.secondary" textAlign="center">

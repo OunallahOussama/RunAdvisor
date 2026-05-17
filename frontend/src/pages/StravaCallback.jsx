@@ -17,6 +17,8 @@ import {
   readStravaOAuthCode,
   readStravaOAuthRedirectUri
 } from '../utils/strava';
+import SecureBrowserAuthNotice from '../components/SecureBrowserAuthNotice';
+import { useGoogleAuthLogin } from '../hooks/useGoogleAuthLogin';
 
 /**
  * Strava OAuth codes are single-use. React 18 Strict Mode runs effects twice and may
@@ -51,7 +53,8 @@ function getOrStartStravaTokenExchange(code, redirectUri) {
 function StravaCallback() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, loginWithRedirect } = useAuth0();
+  const { isAuthenticated, isLoading: authLoading } = useAuth0();
+  const { restricted, openSignInInSystemBrowser, startGoogleLogin } = useGoogleAuthLogin({ signInPath: '/login' });
   const [status, setStatus] = useState('Connecting to Strava…');
   const [failed, setFailed] = useState(false);
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -132,7 +135,7 @@ function StravaCallback() {
 
   const handleSignIn = () => {
     const returnTo = `${location.pathname}${location.search}`;
-    loginWithRedirect({
+    startGoogleLogin({
       appState: { returnTo: returnTo || '/callback' }
     });
   };
@@ -149,9 +152,12 @@ function StravaCallback() {
             <Typography variant="body1" color="text.secondary">
               {status}
             </Typography>
+            {needsSignIn && restricted && (
+              <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} sx={{ width: 1 }} />
+            )}
             {needsSignIn && (
               <Button variant="contained" onClick={handleSignIn}>
-                Sign in to continue
+                {restricted ? 'Open sign-in in browser' : 'Sign in to continue'}
               </Button>
             )}
             {failed && (

@@ -15,8 +15,15 @@ import GoogleIcon from '@mui/icons-material/Google';
 import ThemeToggleButton from '../components/ThemeToggleButton';
 import { CoachIcon, RecoveryIcon, RunAdvisorMark, TargetIcon } from '../components/icons';
 import AuthLegalNotice from '../components/AuthLegalNotice';
+import SecureBrowserAuthNotice from '../components/SecureBrowserAuthNotice';
+import { useGoogleAuthLogin } from '../hooks/useGoogleAuthLogin';
 
-function Register({ onGoogleSignup }) {
+function Register() {
+  const { restricted, openSignInInSystemBrowser, startGoogleLogin } = useGoogleAuthLogin({ signInPath: '/register' });
+
+  const handleGoogleSignup = () => {
+    startGoogleLogin({ appState: { returnTo: '/dashboard' } });
+  };
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
     <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 2, position: 'relative' }}>
@@ -39,6 +46,9 @@ function Register({ onGoogleSignup }) {
           <Typography variant="body2" color="text.secondary" textAlign="center">
             Create your RunAdvisor account with Google.
           </Typography>
+          {restricted && (
+            <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} sx={{ width: 1 }} />
+          )}
           <List dense disablePadding sx={{ width: 1 }}>
             <ListItem sx={{ border: 1, borderColor: 'divider', borderRadius: 2, mb: 1, bgcolor: 'action.hover' }}>
               <ListItemIcon sx={{ minWidth: 36 }}>
@@ -59,8 +69,14 @@ function Register({ onGoogleSignup }) {
               <ListItemText primary="Keep activity detail available on mobile" />
             </ListItem>
           </List>
-          <Button fullWidth size="large" variant="contained" startIcon={<GoogleIcon />} onClick={onGoogleSignup}>
-            Sign up with Google
+          <Button
+            fullWidth
+            size="large"
+            variant="contained"
+            startIcon={<GoogleIcon />}
+            onClick={handleGoogleSignup}
+          >
+            {restricted ? 'Open Google sign-up in browser' : 'Sign up with Google'}
           </Button>
           <Divider sx={{ width: 1 }} />
           <Typography variant="body2" color="text.secondary" textAlign="center">

@@ -31,6 +31,9 @@ import { ApiNotificationProvider, useApiNotification } from './context/ApiNotifi
 import { RunAdvisorProfileProvider } from './context/RunAdvisorProfileContext';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import TrainingSyncManager from './components/TrainingSyncManager';
+import SecureBrowserAuthNotice from './components/SecureBrowserAuthNotice';
+import { useGoogleAuthLogin } from './hooks/useGoogleAuthLogin';
+import { getGoogleAuthRestrictionMessage, isGoogleDisallowedUserAgentError } from './utils/authBrowser';
 import './App.css';
 
 function LoadingScreen({ message }) {
@@ -60,10 +63,10 @@ function AppContent() {
     getAccessTokenSilently,
     isAuthenticated,
     isLoading,
-    loginWithRedirect,
     logout,
     user
   } = useAuth0();
+  const { restricted: authBrowserRestricted, openSignInInSystemBrowser } = useGoogleAuthLogin();
   const { showNotification } = useApiNotification();
   const [profileError, setProfileError] = useState('');
   const [profileSyncing, setProfileSyncing] = useState(false);
@@ -109,7 +112,13 @@ function AppContent() {
     const errorCode = params.get('error');
 
     if (errorDescription || errorCode) {
-      setAuthError(errorDescription || errorCode);
+      const rawError = errorDescription || errorCode;
+      if (isGoogleDisallowedUserAgentError(rawError)) {
+        setAuthError(getGoogleAuthRestrictionMessage());
+        return;
+      }
+
+      setAuthError(rawError);
       return;
     }
 
@@ -162,7 +171,11 @@ function AppContent() {
 
   useEffect(() => {
     if (error?.message) {
-      setAuthError(error.message);
+      setAuthError(
+        isGoogleDisallowedUserAgentError(error.message)
+          ? getGoogleAuthRestrictionMessage()
+          : error.message
+      );
     }
   }, [error]);
 
@@ -219,7 +232,19 @@ function AppContent() {
                 </Alert>
               )}
               {profileError && <Alert severity="error">{profileError}</Alert>}
-              {authError && <Alert severity="warning">Sign-in error: {authError}</Alert>}
+              {authError && (
+                isGoogleDisallowedUserAgentError(authError) || authBrowserRestricted ? (
+                  <SecureBrowserAuthNotice
+                    onOpenInBrowser={openSignInInSystemBrowser}
+                    severity="warning"
+                  />
+                ) : (
+                  <Alert severity="warning">Sign-in error: {authError}</Alert>
+                )
+              )}
+              {!authError && authBrowserRestricted && !isAuthenticated && (
+                <SecureBrowserAuthNotice onOpenInBrowser={openSignInInSystemBrowser} />
+              )}
             </Stack>
             <Routes>
               <Route path="/about" element={<About />} />
@@ -231,7 +256,7 @@ function AppContent() {
                   isAuthenticated ? (
                     <Navigate to="/dashboard" />
                   ) : (
-                    <Login onGoogleLogin={() => loginWithRedirect()} />
+                    <Login />
                   )
                 }
               />
@@ -241,7 +266,7 @@ function AppContent() {
                   isAuthenticated ? (
                     <Navigate to="/dashboard" />
                   ) : (
-                    <Register onGoogleSignup={() => loginWithRedirect()} />
+                    <Register />
                   )
                 }
               />
