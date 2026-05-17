@@ -127,39 +127,6 @@ function TrainingProfile() {
         </Alert>
       )}
 
-      {profile && (
-        <Card variant="outlined" sx={{ mb: 3, bgcolor: 'action.hover' }}>
-          <CardContent>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Account (for admin setup)
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              You do not need the Auth0 website for this. Copy these into <code>.env</code> if you are
-              setting up admin access.
-            </Typography>
-            <Stack spacing={1}>
-              <Typography variant="body2">
-                <strong>Email:</strong>{' '}
-                <Typography component="code" variant="body2">
-                  {profile.email || 'Not synced yet — sign out and sign in again'}
-                </Typography>
-              </Typography>
-              <Typography variant="body2">
-                <strong>Auth0 user id:</strong>{' '}
-                <Typography component="code" variant="body2" sx={{ wordBreak: 'break-all' }}>
-                  {profile.auth0UserId || 'Not available yet'}
-                </Typography>
-              </Typography>
-            </Stack>
-            {profile.auth0UserId && (
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1.5 }}>
-                Example: ADMIN_AUTH0_IDS={profile.auth0UserId}
-              </Typography>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       <Card variant="outlined" component="form" onSubmit={handleSubmit}>
         <CardContent>
           <Stack spacing={2.5}>
