@@ -30,6 +30,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 import ThemeToggleButton from '../ThemeToggleButton';
 import NotificationBell from './NotificationBell';
+import CoachChatWidget from '../coach/CoachChatWidget';
 import { useAppShell } from '../../context/AppShellContext';
 import { RunAdvisorMark } from '../icons';
 
@@ -325,6 +326,8 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
           </BottomNavigation>
         </Paper>
       ) : null}
+
+      <CoachChatWidget enabled={Boolean(user)} />
     </Box>
   );
 }

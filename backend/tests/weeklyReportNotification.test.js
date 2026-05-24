@@ -73,33 +73,55 @@ describe('weekly summary -> notification enqueue', () => {
     createNotification.mockReset();
   });
 
-  it('emits a weekly_report_ready notification when a fresh report is generated', async () => {
+  it('emits weekly_report_ready and coach_nudge when a fresh report is generated', async () => {
     buildAnalytics.mockResolvedValue(makeAnalytics());
     generateReport.mockResolvedValue(makeReport());
     Report.create.mockResolvedValue({ _id: 'report-99', generatedAt: new Date() });
 
     await getOrCreateWeeklySummary({
       userId: 'user-9',
-      user: { consent: { notifications: { weeklyReport: true } } },
+      user: { consent: { notifications: { weeklyReport: true, recommendations: true } } },
       windowDays: 7,
       force: true
     });
 
-    expect(createNotification).toHaveBeenCalledTimes(1);
+    expect(createNotification).toHaveBeenCalledTimes(2);
     expect(createNotification).toHaveBeenCalledWith('user-9', expect.objectContaining({
       type: 'weekly_report_ready',
       severity: 'success'
     }));
+    expect(createNotification).toHaveBeenCalledWith('user-9', expect.objectContaining({
+      type: 'coach_nudge',
+      severity: 'info'
+    }));
   });
 
-  it('skips notification when user opted out of weekly-report notifications', async () => {
+  it('skips weekly report notification but still emits coach nudge when weekly report opted out', async () => {
     buildAnalytics.mockResolvedValue(makeAnalytics());
     generateReport.mockResolvedValue(makeReport());
     Report.create.mockResolvedValue({ _id: 'report-100', generatedAt: new Date() });
 
     await getOrCreateWeeklySummary({
       userId: 'user-10',
-      user: { consent: { notifications: { weeklyReport: false } } },
+      user: { consent: { notifications: { weeklyReport: false, recommendations: true } } },
+      windowDays: 7,
+      force: true
+    });
+
+    expect(createNotification).toHaveBeenCalledTimes(1);
+    expect(createNotification).toHaveBeenCalledWith('user-10', expect.objectContaining({
+      type: 'coach_nudge'
+    }));
+  });
+
+  it('skips all notifications when user opted out of recommendations', async () => {
+    buildAnalytics.mockResolvedValue(makeAnalytics());
+    generateReport.mockResolvedValue(makeReport());
+    Report.create.mockResolvedValue({ _id: 'report-101', generatedAt: new Date() });
+
+    await getOrCreateWeeklySummary({
+      userId: 'user-10b',
+      user: { consent: { notifications: { weeklyReport: false, recommendations: false } } },
       windowDays: 7,
       force: true
     });

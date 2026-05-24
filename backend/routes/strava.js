@@ -307,6 +307,21 @@ async function syncRecentActivitiesForUser(userId, user, accessToken, limit = 20
         severity: 'info',
         data: { syncedCount: savedActivities.length, route: '/activities' }
       });
+
+      const coachNudgesAllowed = user?.consent?.notifications?.recommendations !== false;
+      if (coachNudgesAllowed) {
+        await createNotification(userId, {
+          type: 'coach_session_ready',
+          title: 'New run synced',
+          body: 'Tap to discuss your latest session with your coach.',
+          severity: 'info',
+          data: {
+            syncedCount: savedActivities.length,
+            lastActivityId: savedActivities[0]?._id || null,
+            route: '/'
+          }
+        });
+      }
     }
   } catch (notifyError) {
     console.error('Strava sync notification failed:', notifyError.message || notifyError);

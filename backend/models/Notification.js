@@ -4,6 +4,8 @@ const NOTIFICATION_TYPES = [
   'weekly_report_ready',
   'recommendation_ready',
   'strava_sync_completed',
+  'coach_session_ready',
+  'coach_nudge',
   'consent_reminder',
   'session_today',
   'system'

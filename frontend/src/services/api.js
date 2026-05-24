@@ -181,6 +181,19 @@ export const coachApi = {
   trackUsage: (event, metadata) => api.post('/coach/track-usage', { event, metadata })
 };
 
+export const COACH_NOTIFICATION_TYPES = [
+  'coach_nudge',
+  'coach_session_ready',
+  'weekly_report_ready'
+];
+
+export const coachChatApi = {
+  getContext: () => api.get('/coach/chat/context'),
+  getHistory: (limit = 20) => api.get('/coach/chat/history', { params: { limit } }),
+  sendMessage: (message) => api.post('/coach/chat', { message }, { timeout: 60_000 }),
+  markCoachNotificationsRead: () => api.post('/coach/chat/mark-read')
+};
+
 export const adminApi = {
   getMe: () => api.get('/admin/me'),
   getOverview: (days = 7) => api.get('/admin/overview', { params: { days } }),

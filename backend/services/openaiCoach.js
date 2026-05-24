@@ -210,6 +210,21 @@ async function getOrCreateWeeklySummary({
         }
       });
     }
+
+    const coachNudgesAllowed = user?.consent?.notifications?.recommendations !== false;
+    if (coachNudgesAllowed && generated.report) {
+      await createNotification(userId, {
+        type: 'coach_nudge',
+        title: 'Ask about your training plan',
+        body: 'Your coach is ready to discuss this week\u2019s report and next steps.',
+        severity: 'info',
+        data: {
+          windowDays: generated.windowDays,
+          reportId: saved?._id || null,
+          route: '/'
+        }
+      });
+    }
   } catch (notifyError) {
     console.error('Weekly summary notification failed:', notifyError.message || notifyError);
   }
