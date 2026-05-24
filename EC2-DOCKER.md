@@ -1,246 +1,210 @@
-# RunAdvisor on EC2 (Docker + Caddy + HTTPS)
+## RunAdvisor on EC2 (Docker + Nginx)
 
-This is the canonical production deploy story for RunAdvisor on a small EC2
-box. The stack is a single `docker compose` project:
+This setup keeps Nginx on host ports `80/443` and exposes the frontend container on `localhost:8080`.
 
-```
-                      ┌────────────────────────────────────────────┐
-   client  ── 443 ──▶ │  caddy  (TLS, auto Let's Encrypt cert)     │
-                      │   │                                        │
-                      │   ├─▶ /api/*  /health  ──▶ backend :5000  │
-                      │   └─▶ /*                ──▶ frontend :3000│
-                      │                                            │
-                      │                            mongodb :27017  │
-                      └────────────────────────────────────────────┘
-                              (single docker bridge network)
-```
+### 1) Install Docker on Amazon Linux
 
-Only ports `80` and `443` are exposed on the host. Mongo, the backend API,
-and the frontend bundle are all reached **through Caddy**, never directly.
-
-> Looking for legacy host-nginx deploys? See `deploy/nginx/runadvisor.conf`
-> and `scripts/ec2-deploy.sh`. They still work but are no longer the
-> recommended path — the new flow below ships with managed TLS out of the box.
-
----
-
-## EC2 quick start (10 steps)
-
-1. **Launch an Ubuntu 24.04 EC2 instance.** `t3.small` (2 vCPU, 2 GB RAM) is
-   the recommended minimum; `t3.medium` if you plan to enable OpenAI features
-   (Smart Weekly Summary + Training Report) at high concurrency.
-   Security-group inbound rules:
-   - TCP `22`  – your office IP only
-   - TCP `80`  – `0.0.0.0/0` (Let's Encrypt HTTP-01 challenge)
-   - TCP `443` – `0.0.0.0/0`
-   - UDP `443` – `0.0.0.0/0` (HTTP/3 — optional but nice)
-   Leave `5000`, `3000`, `8080`, `27017` **closed** to the internet.
-
-2. **Allocate an Elastic IP, attach it to the instance, then create an
-   `A` record** at your registrar pointing your chosen `DOMAIN`
-   (e.g. `runadvisor.fit`) at that IP. Wait for DNS to propagate
-   (check with `dig +short runadvisor.fit`).
-
-3. **SSH in and run the bootstrap script** (installs Docker CE + compose
-   plugin, joins your user to the `docker` group, clones the repo,
-   seeds an empty `.env.ec2`):
-   ```bash
-   ssh ubuntu@<elastic-ip>
-   curl -fsSL https://raw.githubusercontent.com/OunallahOussama/RunAdvisor/main/scripts/ec2-bootstrap.sh | bash
-   exit                                  # so the docker group takes effect
-   ```
-
-4. **Reconnect, edit `.env.ec2`** and fill in every value flagged
-   `YOU MUST FILL` (full table in `.env.ec2.example`):
-   ```bash
-   ssh ubuntu@<elastic-ip>
-   cd ~/RunAdvisor
-   nano .env.ec2
-   # generate a Strava token encryption key while you're in there:
-   openssl rand -hex 32
-   ```
-   At minimum set: `DOMAIN`, `LETSENCRYPT_EMAIL`, `MONGO_INITDB_ROOT_PASSWORD`
-   (and update `MONGODB_URI` to match), `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` /
-   `AUTH0_AUDIENCE`, `STRAVA_CLIENT_ID` / `STRAVA_CLIENT_SECRET` /
-   `STRAVA_WEBHOOK_VERIFY_TOKEN` / `STRAVA_TOKEN_ENCRYPTION_KEY`,
-   `ADMIN_EMAILS`. Set `OPENAI_API_KEY` if you want AI summaries.
-
-5. **Whitelist the public domain on Auth0** (Dashboard → Applications →
-   your SPA → Settings). Add to all three of *Allowed Callback URLs*,
-   *Allowed Logout URLs*, and *Allowed Web Origins*:
-   ```
-   https://<DOMAIN>
-   https://<DOMAIN>/login
-   ```
-   (Add the `www.` variants too only if you actually serve a `www.` alias.)
-   Enable *Refresh Token Rotation* + *Allow Offline Access* on the API.
-
-6. **Configure Strava** ([API settings](https://www.strava.com/settings/api)):
-   - **Authorization Callback Domain:** `<DOMAIN>` (domain only, no scheme)
-   - The OAuth redirect is therefore `https://<DOMAIN>/callback`, which
-     matches `STRAVA_REDIRECT_URI` in `.env.ec2`.
-
-7. **Deploy:**
-   ```bash
-   cd ~/RunAdvisor
-   ./scripts/deploy.sh
-   ```
-   The first run pulls the base images, builds the backend + frontend images
-   (10–15 min on a `t3.small` for the React build — be patient), and starts
-   Caddy. Caddy will provision a Let's Encrypt cert automatically on first
-   request, so subsequent visits to `https://<DOMAIN>` get a real cert.
-
-8. **Verify** (the script also prints these at the end):
-   ```bash
-   curl -I https://<DOMAIN>/                 # 200
-   curl -I https://<DOMAIN>/health           # 200 (JSON body has mongodb/auth0/strava)
-   curl -I https://<DOMAIN>/api/auth/me      # 401 (correct when not logged in)
-   docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
-   ```
-   If `/health` returns `DEGRADED`, check that `AUTH0_DOMAIN` /
-   `AUTH0_AUDIENCE` are set and that Mongo started.
-
-9. **Subscribe Strava to webhooks** (one-time, replaces polling for
-   real-time activity sync). From any machine with `curl`:
-   ```bash
-   curl -X POST https://www.strava.com/api/v3/push_subscriptions \
-     -F client_id=$STRAVA_CLIENT_ID \
-     -F client_secret=$STRAVA_CLIENT_SECRET \
-     -F callback_url=https://<DOMAIN>/api/strava/webhook \
-     -F verify_token=$STRAVA_WEBHOOK_VERIFY_TOKEN
-   ```
-   Verify with `GET https://www.strava.com/api/v3/push_subscriptions?...`.
-
-10. **(Optional) cron the Mongo backup** so you don't lose user training
-    history:
-    ```bash
-    crontab -e
-    # daily at 03:15 server time, keeps last 14 snapshots in ~/backups
-    15 3 * * *  /home/ubuntu/RunAdvisor/scripts/backup-mongo.sh >> /home/ubuntu/RunAdvisor/backup.log 2>&1
-    ```
-
----
-
-## Post-deploy smoke test
-
-After the stack is up, walk through this in a browser at
-`https://<DOMAIN>` to confirm every new feature works end-to-end:
-
-1. **Sign up / log in via Auth0.** First-time users should land on the
-   **onboarding stepper** (theme intro, running goal, Strava connect,
-   notification + privacy consent).
-2. **Connect Strava** from the stepper — confirm you bounce to
-   `https://www.strava.com`, accept, and come back to `https://<DOMAIN>/callback`
-   with the dashboard populated.
-3. **Sync recent activities**, then open the **Training Report** page
-   (`/training-report`) and click *Generate report* — should return a
-   structured report within ~30s (uses OpenAI if `OPENAI_API_KEY` set,
-   otherwise a deterministic fallback).
-4. **Open the dashboard** and confirm the **Smart Weekly Summary card**
-   renders with a headline + bullets + load-risk badge.
-5. **Click the notification bell** in the AppShell top bar — drawer should
-   open and the new `Notification` model entries (e.g. weekly report ready)
-   should appear. Mark one as read and confirm the unread count drops.
-6. **Toggle theme** (light/dark) from the AppShell button. The choice should
-   persist across reload (`localStorage`).
-7. **Open dev-tools → device mode** and confirm the AppShell layout is
-   usable on mobile (375 px wide).
-8. **Replay the onboarding tour** from the Profile menu → "Replay tour"
-   to confirm `PUT /api/users/me/onboarding-complete { reset: true }` works.
-
----
-
-## Updating
+**Amazon Linux 2023** uses `dnf`. **Amazon Linux 2** uses `yum`:
 
 ```bash
-# on the EC2 box
-cd ~/RunAdvisor
-./scripts/deploy.sh
+# Amazon Linux 2
+sudo yum -y install docker git nginx
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+# log out and back in, or: newgrp docker
+
+# Amazon Linux 2023
+# sudo dnf -y install docker git nginx
 ```
 
-`deploy.sh` is idempotent: it runs `git fetch && git reset --hard origin/main`,
-re-builds, prunes dangling images, then prints health probes.
-
-> **Heads-up:** every `REACT_APP_*` variable is baked into the frontend image
-> at *build* time. Changing any of them (e.g. moving to a new domain, rotating
-> Auth0 client ID) requires rebuilding the frontend specifically:
-> ```bash
-> docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build frontend
-> ```
-> `deploy.sh` already rebuilds all services, so a normal `./scripts/deploy.sh`
-> covers it too.
-
-### GitHub Actions auto-deploy (optional)
-
-`.github/workflows/deploy.yml` ships disabled-by-default (it only runs when the
-listed repo secrets exist). To enable, add these **repository secrets**:
-
-| Secret        | Example value                              |
-|---------------|--------------------------------------------|
-| `EC2_HOST`    | `runadvisor.example.com` (or Elastic IP)   |
-| `EC2_USER`    | `ubuntu` (or `ec2-user` on AL2023)         |
-| `EC2_SSH_KEY` | private key for a dedicated deploy user    |
-
-Optionally add a **repository variable** `EC2_REPO_DIR` if the checkout lives
-somewhere other than `~/RunAdvisor`. Once set, every push to `main` SSHes in
-and runs `./scripts/deploy.sh`; you can also trigger it manually with
-*Run workflow* in the Actions tab.
-
----
-
-## Backups & restore
-
-`scripts/backup-mongo.sh` runs `mongodump` *inside* the running mongo
-container, copies the dump out, tars it into `~/backups/runadvisor-<stamp>.tar.gz`
-and keeps the last 14 snapshots. To restore one:
+Or run the automated bootstrap from the repo root on EC2:
 
 ```bash
-cd ~/backups
-tar -xzf runadvisor-20260524-031500.tar.gz
-docker cp runadvisor-20260524-031500 runadvisor-mongodb:/tmp/restore
-docker exec runadvisor-mongodb mongorestore \
-  --username=admin --password="$MONGO_INITDB_ROOT_PASSWORD" \
-  --authenticationDatabase=admin \
-  --drop /tmp/restore
+chmod +x scripts/ec2-bootstrap.sh
+./scripts/ec2-bootstrap.sh YOUR_PUBLIC_IP
 ```
 
----
+### 2) Ensure Docker Compose is available
 
-## Operational cheatsheet
+Try plugin first:
 
 ```bash
-# tail everything
-docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f
+docker compose version
+```
 
-# just the backend
-docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f backend
+If plugin is unavailable, install standalone binary:
 
-# rebuild + restart only the frontend (after REACT_APP_* change)
-docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build frontend
+```bash
+sudo curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64" \
+  -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+docker-compose version
+```
 
-# nuke + restart (keeps mongo volume)
+### 3) Verify buildx version and context
+
+BuildKit/buildx should be `>= 0.17` for reliable builds.
+
+```bash
+docker buildx version
+sudo docker buildx version
+```
+
+If root and user contexts differ, run compose commands consistently with the same context (all `docker ...` or all `sudo docker ...`) and recreate the builder in that context if needed:
+
+```bash
+docker buildx create --name runadvisor-builder --use || true
+docker buildx inspect --bootstrap
+```
+
+### 4) Configure environment and start services
+
+```bash
+cp .env.ec2.example .env.ec2
+# Set secrets and confirm URLs use https://runadvisor.fit (see .env.ec2.example)
+nano .env.ec2
+```
+
+For Auth0 (Application → Settings), add **every** URL users may use (http and https until certbot is done):
+
+- Allowed Callback URLs: `http://runadvisor.fit`, `https://runadvisor.fit`, `http://www.runadvisor.fit`, `https://www.runadvisor.fit`, `http://localhost:3000`
+- Allowed Logout URLs: the list above **plus** `https://runadvisor.fit/login`, `https://www.runadvisor.fit/login` (the app signs out to `/login`)
+- Allowed Web Origins: same as callback URLs
+
+If logout shows Auth0 “misconfiguration”, the `returnTo` URL is missing from **Allowed Logout URLs** for application `AUTH0_CLIENT_ID`.
+
+Auth0 Dashboard → APIs → your API (`https://runadvisor-api`) → enable the SPA application.
+
+Auth0 Dashboard → Applications → SPA → Settings → Application Type must be **Single Page Application**.
+
+Strava ([API settings](https://www.strava.com/settings/api)):
+
+- **Authorization Callback Domain:** `runadvisor.fit` (domain only, no `https://`)
+- After OAuth, Strava redirects to `{your-origin}/callback` (e.g. `http://runadvisor.fit/callback` or `https://runadvisor.fit/callback` once HTTPS works). The app uses the browser origin automatically.
+
+Before HTTPS is ready, use `http://runadvisor.fit` in `.env.ec2` and Auth0/Strava, then switch to `https://` and rebuild the frontend after certbot.
+
+Use `--env-file` on every compose command:
+
+```bash
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml pull
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs --tail=100
 docker compose --env-file .env.ec2 -f docker-compose.ec2.yml down
-./scripts/deploy.sh
-
-# show certificate state (Caddy stores them in the named volume)
-docker exec runadvisor-caddy caddy list-certificates
-
-# completely wipe (also drops mongo data — DANGEROUS)
-docker compose --env-file .env.ec2 -f docker-compose.ec2.yml down -v
 ```
 
----
+### 5) Configure Nginx reverse proxy
 
-## Troubleshooting
+Compose publishes:
 
-| Symptom | Likely cause / fix |
-|---|---|
-| `curl -I https://<DOMAIN>/` returns connection refused | Security group missing `443`, or the `caddy` container isn't running. `docker ps`; `docker logs runadvisor-caddy`. |
-| HTTPS works but cert is self-signed | Caddy could not reach Let's Encrypt — verify `DOMAIN` actually resolves to this server, port `80` is open inbound, and `LETSENCRYPT_EMAIL` is set. |
-| Login bounces back to Auth0 with "callback URL mismatch" | Add `https://<DOMAIN>` and `https://<DOMAIN>/login` to **Allowed Callback URLs** *and* **Allowed Logout URLs** *and* **Allowed Web Origins** in the Auth0 dashboard. |
-| Strava connect returns "redirect_uri mismatch" | Strava → API → Authorization Callback Domain must equal `<DOMAIN>` (no scheme, no path). |
-| `/health` returns `DEGRADED` with `mongodb: error` | Mongo creds in `.env.ec2` don't match `MONGODB_URI`. They must agree on user+password+db. |
-| Backend logs spam `MongoServerError: bad auth` | Same as above. Edit `.env.ec2`, then `./scripts/deploy.sh`. |
-| Frontend shows stale URLs after `.env.ec2` edit | `REACT_APP_*` is baked at build time. Rebuild the frontend: `docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build frontend`. |
-| Build OOMs on `t3.micro` / `t3.small` | The bootstrap script enables a 2 GB swap; if you skipped it run `bash scripts/ec2-add-swap.sh`. Upgrade to `t3.medium` if it keeps biting. |
-| Smart Weekly Summary endpoint times out | Caddy timeout is 120s, OpenAI can occasionally take longer — set `OPENAI_MODEL=gpt-4o-mini` (default), or unset `OPENAI_API_KEY` to fall back to deterministic summaries. |
+- **Frontend** on host `8080` (`8080:3000`)
+- **Backend API** on host `5000` (`5000:5000`) so Nginx can proxy `/api/` to Express
+
+Without `location /api/`, requests like `/api/strava/authenticate` hit the React app and return **502** or fail Strava with a **Network Error**.
+
+Example server block (HTTP):
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com www.your-domain.com;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000/api/;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Validate upstream before relying on the domain:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5000/health
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/
+```
+
+Expect `200` for both. Then:
+
+```bash
+curl -i http://127.0.0.1/api/auth/me
+```
+
+Expect `401` JSON when not logged in (not `502`).
+
+Validate and reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+### Frontend recovery quick path
+
+If `frontend` is down/missing while `backend` and `mongodb` are running:
+
+```bash
+# from repo root on EC2
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build frontend
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml ps
+docker compose --env-file .env.ec2 -f docker-compose.ec2.yml logs -f --tail=200 frontend
+```
+
+Install Nginx site from the repo (already set for `runadvisor.fit`):
+
+```bash
+sudo cp deploy/nginx/runadvisor.conf /etc/nginx/conf.d/runadvisor.conf
+```
+
+Reload and validate local path:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -I http://127.0.0.1:8080
+curl -I http://127.0.0.1:5000/health
+curl -I http://127.0.0.1/api/auth/me
+```
+
+### 6) Optional HTTPS with certbot
+
+**Amazon Linux 2023:** `sudo dnf -y install certbot python3-certbot-nginx`
+
+**Amazon Linux 2:** `yum` does not ship certbot. Use a venv:
+
+```bash
+sudo yum install -y python3 augeas-libs
+sudo python3 -m venv /opt/certbot
+sudo /opt/certbot/bin/pip install --upgrade pip certbot certbot-nginx 'urllib3<2'
+sudo ln -sf /opt/certbot/bin/certbot /usr/bin/certbot
+certbot --version
+```
+
+Issue certificate (HTTP must work on port 80 first):
+
+```bash
+sudo certbot --nginx -d runadvisor.fit -d www.runadvisor.fit
+sudo certbot renew --dry-run
+```
+
+After HTTPS works, set `https://runadvisor.fit` in `.env.ec2`, Auth0, and Strava, then rebuild the frontend image.
+
+### Security group guidance
+
+- Open inbound `80` and `443` to the internet.
+- Keep `8080` and `5000` closed publicly (both are localhost targets behind Nginx). Only `80`/`443` need to be open for users.
