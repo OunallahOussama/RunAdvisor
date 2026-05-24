@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Collapse from '@mui/material/Collapse';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import Skeleton from '@mui/material/Skeleton';
@@ -10,6 +11,27 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import SendIcon from '@mui/icons-material/Send';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import CoachRichMessage from './CoachRichMessage';
+import { formatNumber } from '../../utils/weeklyPlanShared';
+
+function formatSyncDate(value) {
+  if (!value) {
+    return 'No sync yet';
+  }
+  try {
+    return new Date(value).toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return 'Recently synced';
+  }
+}
 
 function MessageBubble({ message }) {
   const isUser = message.role === 'user';
@@ -19,7 +41,7 @@ function MessageBubble({ message }) {
     <Box
       sx={{
         alignSelf: isUser ? 'flex-end' : 'flex-start',
-        maxWidth: '88%',
+        maxWidth: '92%',
         px: 1.5,
         py: 1,
         borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
@@ -40,6 +62,9 @@ function MessageBubble({ message }) {
       <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
         {message.content}
       </Typography>
+      {!isUser && message.richContent ? (
+        <CoachRichMessage richContent={message.richContent} />
+      ) : null}
     </Box>
   );
 }
@@ -51,6 +76,76 @@ function ContextSkeleton() {
       <Skeleton variant="rounded" height={72} />
       <Skeleton variant="rounded" height={72} />
     </Stack>
+  );
+}
+
+function ContextStrip({ context }) {
+  const [expanded, setExpanded] = useState(false);
+  const metrics = context?.keyMetrics;
+  const nextTitle = context?.nextSession?.title;
+
+  if (!metrics && !nextTitle) {
+    return null;
+  }
+
+  const chips = [
+    metrics?.totalDistanceKm != null
+      ? { label: 'Distance', value: `${formatNumber(metrics.totalDistanceKm)} km` }
+      : null,
+    metrics?.acwr != null
+      ? { label: 'ACWR', value: formatNumber(metrics.acwr, { digits: 2 }) }
+      : null,
+    nextTitle ? { label: 'Next', value: nextTitle } : null
+  ].filter(Boolean);
+
+  const fullMetrics = metrics
+    ? [
+        { label: 'Runs/week', value: formatNumber(metrics.runsPerWeek, { digits: 1 }) },
+        { label: 'Weekly load', value: formatNumber(metrics.weeklyLoad, { digits: 0 }) },
+        { label: 'Monotony', value: formatNumber(metrics.monotony, { digits: 2 }) }
+      ]
+    : [];
+
+  return (
+    <Box
+      sx={{
+        px: 2,
+        py: 1,
+        borderBottom: 1,
+        borderColor: 'divider',
+        bgcolor: 'background.surfaceContainer'
+      }}
+      data-testid="coach-context-strip"
+    >
+      <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ flex: 1, minWidth: 0 }}>
+          {chips.slice(0, 3).map((chip) => (
+            <Chip
+              key={chip.label}
+              size="small"
+              label={`${chip.label}: ${chip.value}`}
+              sx={{ maxWidth: '100%' }}
+            />
+          ))}
+        </Stack>
+        <Chip
+          size="small"
+          variant="outlined"
+          label={expanded ? 'Hide data' : 'View data'}
+          onClick={() => setExpanded((v) => !v)}
+          icon={expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          clickable
+          data-testid="coach-context-toggle"
+        />
+      </Stack>
+      <Collapse in={expanded}>
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+          {fullMetrics.map((m) => (
+            <Chip key={m.label} size="small" variant="outlined" label={`${m.label}: ${m.value}`} />
+          ))}
+        </Stack>
+      </Collapse>
+    </Box>
   );
 }
 
@@ -66,7 +161,7 @@ function CoachChatPanel({
   onSend,
   onRetry
 }) {
-  const [input, setInput] = React.useState('');
+  const [input, setInput] = useState('');
   const scrollRef = useRef(null);
   const listRef = useRef(null);
 
@@ -94,6 +189,7 @@ function CoachChatPanel({
   };
 
   const showEmpty = !loadingContext && !loadingHistory && messages.length === 0;
+  const syncLabel = formatSyncDate(context?.lastSyncAt || context?.lastSession?.date);
 
   return (
     <Box
@@ -115,20 +211,34 @@ function CoachChatPanel({
           bgcolor: 'background.surface'
         }}
       >
-        <Typography variant="subtitle1" fontWeight={700}>
-          Running Coach
-        </Typography>
-        {context?.lastSession ? (
-          <Typography variant="caption" color="text.secondary" noWrap>
-            Last run: {context.lastSession.name}
-            {context.lastSession.distanceKm ? ` · ${context.lastSession.distanceKm} km` : ''}
-          </Typography>
-        ) : (
-          <Typography variant="caption" color="text.secondary">
-            Sync a run to get personalized feedback
-          </Typography>
-        )}
+        <Stack direction="row" spacing={1.25} alignItems="center">
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            <SmartToyIcon fontSize="small" />
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography variant="subtitle1" fontWeight={700} noWrap>
+              RunAdvisor Coach
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              Data copilot · Last sync {syncLabel}
+            </Typography>
+          </Box>
+        </Stack>
       </Box>
+
+      {!loadingContext && context ? <ContextStrip context={context} /> : null}
 
       <Box
         ref={listRef}
@@ -170,24 +280,8 @@ function CoachChatPanel({
         {showEmpty ? (
           <Box sx={{ py: 2 }}>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, textAlign: 'center' }}>
-              Ask about your last session or what to improve next.
+              Chat with your training data — ask about your plan, load, or latest report.
             </Typography>
-            <Stack direction="row" flexWrap="wrap" gap={1} justifyContent="center">
-              {suggestedPrompts.map((prompt) => (
-                <Chip
-                  key={prompt}
-                  label={prompt}
-                  size="small"
-                  clickable
-                  onClick={() => handlePromptClick(prompt)}
-                  sx={{
-                    bgcolor: 'background.surfaceContainer',
-                    '&:hover': { bgcolor: 'action.hover' }
-                  }}
-                  data-testid="coach-suggested-prompt"
-                />
-              ))}
-            </Stack>
           </Box>
         ) : null}
 
@@ -226,6 +320,40 @@ function CoachChatPanel({
         ) : null}
         <div ref={scrollRef} />
       </Box>
+
+      {suggestedPrompts.length > 0 ? (
+        <Box
+          sx={{
+            px: 1.5,
+            py: 1,
+            borderTop: 1,
+            borderColor: 'divider',
+            bgcolor: 'background.surface',
+            overflowX: 'auto',
+            display: 'flex',
+            gap: 0.75,
+            flexWrap: 'nowrap'
+          }}
+          data-testid="coach-suggested-prompts-row"
+        >
+          {suggestedPrompts.map((prompt) => (
+            <Chip
+              key={prompt}
+              label={prompt}
+              size="small"
+              clickable
+              onClick={() => handlePromptClick(prompt)}
+              disabled={sending || loadingContext}
+              sx={{
+                flexShrink: 0,
+                bgcolor: 'background.surfaceContainer',
+                '&:hover': { bgcolor: 'action.hover' }
+              }}
+              data-testid="coach-suggested-prompt"
+            />
+          ))}
+        </Box>
+      ) : null}
 
       <Box
         component="form"

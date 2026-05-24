@@ -45,8 +45,10 @@ function renderWidget(overrides = {}) {
     retry: jest.fn(),
     suggestedPrompts: [
       'How was my last run?',
-      'What should I improve?',
-      'Explain my effort level'
+      "What's my next recommendation?",
+      'Show my weekly report',
+      "What's my training load?",
+      'Explain my 7-day plan'
     ],
     ...overrides
   });
@@ -79,9 +81,9 @@ describe('CoachChatWidget', () => {
     });
 
     expect(screen.getByTestId('coach-chat-widget')).toBeInTheDocument();
-    expect(screen.getByText(/Running Coach/i)).toBeInTheDocument();
+    expect(screen.getByText(/RunAdvisor Coach/i)).toBeInTheDocument();
     expect(screen.getAllByTestId('coach-suggested-prompt').length).toBeGreaterThanOrEqual(3);
-    expect(screen.getByText(/How was my last run/i)).toBeInTheDocument();
+    expect(screen.getByText(/Show my weekly report/i)).toBeInTheDocument();
   });
 
   it('calls openPanel when FAB is clicked', () => {
@@ -105,9 +107,9 @@ describe('CoachChatWidget', () => {
       messages: []
     });
 
-    fireEvent.click(screen.getByText(/What should I improve/i));
+    fireEvent.click(screen.getByText(/Show my weekly report/i));
     await waitFor(() => {
-      expect(sendMessage).toHaveBeenCalledWith('What should I improve?');
+      expect(sendMessage).toHaveBeenCalledWith('Show my weekly report');
     });
   });
 });

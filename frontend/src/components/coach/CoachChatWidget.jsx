@@ -8,7 +8,7 @@ import Slide from '@mui/material/Slide';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme } from '@mui/material/styles';
 import CloseIcon from '@mui/icons-material/Close';
-import SportsIcon from '@mui/icons-material/Sports';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
 import CoachChatPanel from './CoachChatPanel';
 import useCoachChat from '../../hooks/useCoachChat';
 
@@ -32,6 +32,8 @@ function CoachChatWidget({ enabled = true }) {
     suggestedPrompts
   } = useCoachChat({ enabled });
 
+  const hasUnreadCoachNudge = badgeCount > 0;
+
   if (!enabled) {
     return null;
   }
@@ -48,11 +50,20 @@ function CoachChatWidget({ enabled = true }) {
             position: 'fixed',
             right: isMobile ? 16 : 24,
             bottom: isMobile ? 80 : 24,
-            zIndex: (t) => t.zIndex.drawer
+            zIndex: (t) => t.zIndex.drawer,
+            ...(hasUnreadCoachNudge
+              ? {
+                  animation: 'coachFabPulse 2s ease-in-out infinite',
+                  '@keyframes coachFabPulse': {
+                    '0%, 100%': { boxShadow: `0 0 0 0 ${theme.palette.primary.main}66` },
+                    '50%': { boxShadow: `0 0 0 10px ${theme.palette.primary.main}00` }
+                  }
+                }
+              : {})
           }}
         >
           <Badge badgeContent={badgeCount} color="error" max={9} overlap="circular">
-            <SportsIcon />
+            <SmartToyIcon />
           </Badge>
         </Fab>
       ) : null}
@@ -79,8 +90,8 @@ function CoachChatWidget({ enabled = true }) {
               : {
                   right: 24,
                   bottom: 24,
-                  width: 380,
-                  height: 520,
+                  width: 400,
+                  height: 560,
                   maxHeight: 'calc(100vh - 48px)'
                 })
           }}

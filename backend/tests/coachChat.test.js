@@ -70,11 +70,35 @@ describe('coachChatService', () => {
       sort: jest.fn().mockReturnValue({
         lean: jest.fn().mockResolvedValue({
           _id: 'report-1',
+          generatedAt: new Date('2026-05-20T12:00:00.000Z'),
           report: {
+            executiveSummary: {
+              headline: 'Training is progressing well',
+              readinessPhase: 'build',
+              paragraph: 'Over the last 84 days you ran consistently with healthy ACWR.'
+            },
+            riskAndRecovery: { injuryRiskLevel: 'low' },
+            weeklyPlan: [
+              { day: 1, title: 'Easy aerobic run', sessionType: 'easy_run', durationMinutes: 45, distanceKm: 8, rpe: 4 },
+              { day: 2, title: 'Rest day', sessionType: 'rest_or_xt', durationMinutes: 0, distanceKm: 0, rpe: 2 }
+            ],
             nextSessionDetail: {
               title: 'Tempo intervals',
-              durationMinutes: 50
+              durationMinutes: 50,
+              objective: 'Build threshold'
             }
+          },
+          analytics: {
+            volume: { totalDistanceKm: 120, runsPerWeek: 4 },
+            pace: { avgPaceMinPerKm: 5.2 },
+            trainingLoad: { acwr: 1.1, weeklyLoad: 280, monotony: 1.3 },
+            intensityDistribution: { easy: 72, tempo: 12, threshold: 10, vo2: 6 },
+            weeklyLoadSeries: [
+              { label: 'W1', load: 240, totalDistanceKm: 28 },
+              { label: 'W2', load: 260, totalDistanceKm: 30 },
+              { label: 'W3', load: 275, totalDistanceKm: 32 },
+              { label: 'W4', load: 280, totalDistanceKm: 33 }
+            ]
           }
         })
       })
@@ -121,6 +145,22 @@ describe('coachChatService', () => {
       );
       expect(context.hasUnreadCoachNudge).toBe(true);
       expect(context.reportId).toBe('report-1');
+      expect(context.weeklyPlan).toEqual(expect.arrayContaining([
+        expect.objectContaining({ title: 'Easy aerobic run', sessionType: 'easy_run' })
+      ]));
+      expect(context.keyMetrics).toEqual(expect.objectContaining({
+        totalDistanceKm: 120,
+        acwr: 1.1,
+        weeklyLoad: 280
+      }));
+      expect(context.reportSummary).toEqual(expect.objectContaining({
+        headline: 'Training is progressing well',
+        readinessPhase: 'build'
+      }));
+      expect(context.weeklyLoadSeries).toHaveLength(4);
+      expect(context.suggestedPrompts).toEqual(
+        expect.arrayContaining(["What's my next recommendation?", 'Show my weekly report'])
+      );
     });
 
     it('handles missing activities gracefully', async () => {
@@ -172,6 +212,10 @@ describe('coachChatService', () => {
         durationMinutes: 50
       }));
       expect(compact.nextSession.warmup).toBeUndefined();
+      expect(compact.weeklyPlan).toEqual(expect.arrayContaining([
+        expect.stringMatching(/Easy aerobic run/)
+      ]));
+      expect(compact.weeklyPlan.length).toBeLessThanOrEqual(7);
     });
   });
 
@@ -224,6 +268,32 @@ describe('coachChatService', () => {
       const { reply } = buildRuleBasedCoachReply('How was my last run?', { lastSession: null });
       expect(reply).toMatch(/Sync a run from Strava/i);
     });
+
+    it('returns richContent for weekly report intent', () => {
+      const context = {
+        ...mockContext,
+        keyMetrics: { totalDistanceKm: 120, acwr: 1.1, weeklyLoad: 280, monotony: 1.3 },
+        weeklyPlan: [
+          { day: 1, title: 'Easy run', sessionType: 'easy_run', durationMinutes: 45, distanceKm: 8, rpe: 4 }
+        ],
+        reportSummary: {
+          headline: 'Solid week',
+          readinessPhase: 'build',
+          executiveParagraph: 'You are progressing well.',
+          injuryRiskLevel: 'low'
+        },
+        weeklyLoadSeries: [{ label: 'W4', load: 280 }]
+      };
+
+      const { reply, source, richContent } = buildRuleBasedCoachReply('Show my weekly report', context);
+
+      expect(source).toBe('rules');
+      expect(reply).toMatch(/Solid week|progressing/i);
+      expect(richContent).toEqual({
+        type: 'report_summary',
+        data: expect.objectContaining({ headline: 'Solid week' })
+      });
+    });
   });
 
   describe('sendChatMessage', () => {
@@ -247,6 +317,23 @@ describe('coachChatService', () => {
       expect(result.reply).not.toMatch(/Connect OpenAI/i);
       expect(result.messages.length).toBe(2);
       expect(save).toHaveBeenCalled();
+    });
+
+    it('returns richContent on POST for weekly report prompt', async () => {
+      const save = jest.fn().mockResolvedValue(undefined);
+      CoachChat.findOne.mockResolvedValue({
+        messages: [],
+        contextSnapshot: {},
+        save
+      });
+
+      const result = await sendChatMessage('user-1', { name: 'Alex' }, 'Show my weekly report');
+
+      expect(result.richContent).toEqual({
+        type: 'report_summary',
+        data: expect.objectContaining({ headline: 'Training is progressing well' })
+      });
+      expect(result.source).toBe('rules');
     });
 
     it('returns sync prompt when no session data exists', async () => {

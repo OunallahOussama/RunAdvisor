@@ -17,7 +17,7 @@ const MAX_COMPLETION_TOKENS = 500;
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const DEBOUNCE_MS = 10 * 1000;
 
-const RULE_INTENT_PATTERN = /plan|tomorrow|next session|how was|last (run|session)|effort|rpe|hard|improve|what should|\bnext\b/i;
+const RULE_INTENT_PATTERN = /plan|7.?day|this week|tomorrow|next session|recommendation|how was|last (run|session)|effort|rpe|hard|improve|what should|report|weekly summary|how am i doing|training load|\bacwr\b|\bload\b/i;
 
 const COACH_NOTIFICATION_TYPES = [
   'coach_nudge',
@@ -27,9 +27,13 @@ const COACH_NOTIFICATION_TYPES = [
 
 const DEFAULT_SUGGESTED_PROMPTS = [
   'How was my last run?',
-  'What should I improve?',
-  'Explain my effort level'
+  "What's my next recommendation?",
+  'Show my weekly report',
+  "What's my training load?",
+  'Explain my 7-day plan'
 ];
+
+const EXEC_SUMMARY_MAX_CHARS = 300;
 
 function buildLastSessionComment(analyzed) {
   if (!analyzed) {
@@ -123,6 +127,63 @@ async function loadLatestReport(userId) {
     .lean();
 }
 
+function serializeWeeklyPlan(latestReport) {
+  const plan = latestReport?.report?.weeklyPlan || [];
+  return plan.slice(0, 7).map((day, index) => ({
+    day: day.day ?? index + 1,
+    title: day.title || `Day ${index + 1}`,
+    sessionType: day.sessionType || 'easy_run',
+    durationMinutes: day.durationMinutes ?? null,
+    distanceKm: day.distanceKm ?? null,
+    rpe: day.rpe ?? null
+  }));
+}
+
+function buildKeyMetrics(analytics) {
+  const volume = analytics?.volume || {};
+  const load = analytics?.trainingLoad || {};
+  const pace = analytics?.pace || {};
+
+  return {
+    totalDistanceKm: volume.totalDistanceKm ?? 0,
+    runsPerWeek: volume.runsPerWeek ?? 0,
+    acwr: load.acwr ?? 0,
+    weeklyLoad: load.weeklyLoad ?? 0,
+    avgPaceMinPerKm: pace.avgPaceMinPerKm ?? 0,
+    intensityPct: analytics?.intensityDistribution || { easy: 0, tempo: 0, threshold: 0, vo2: 0 },
+    monotony: load.monotony ?? 0
+  };
+}
+
+function buildReportSummary(latestReport) {
+  const executive = latestReport?.report?.executiveSummary;
+  if (!executive) {
+    return null;
+  }
+
+  const paragraph = String(executive.paragraph || '');
+  const truncated = paragraph.length > EXEC_SUMMARY_MAX_CHARS
+    ? `${paragraph.slice(0, EXEC_SUMMARY_MAX_CHARS - 1)}…`
+    : paragraph;
+
+  return {
+    headline: executive.headline || '',
+    readinessPhase: executive.readinessPhase || 'build',
+    executiveParagraph: truncated,
+    injuryRiskLevel: latestReport?.report?.riskAndRecovery?.injuryRiskLevel || 'low',
+    reportGeneratedAt: latestReport?.generatedAt || latestReport?.report?.generatedAt || null
+  };
+}
+
+function buildWeeklyLoadSeriesSlice(analytics, weeks = 4) {
+  const series = analytics?.weeklyLoadSeries || [];
+  return series.slice(-weeks).map((entry) => ({
+    label: entry.label,
+    load: entry.load ?? 0,
+    totalDistanceKm: entry.totalDistanceKm ?? 0
+  }));
+}
+
 async function countUnreadCoachNudges(userId) {
   return Notification.countDocuments({
     userId,
@@ -141,6 +202,10 @@ async function buildChatContext(userId, user = {}) {
   const lastSession = serializeLastSession(analyzed, lastActivity);
   const nextSession = latestReport?.report?.nextSessionDetail || null;
   const trainingLoad = latestReport?.analytics?.trainingLoad || null;
+  const weeklyPlan = serializeWeeklyPlan(latestReport);
+  const keyMetrics = buildKeyMetrics(latestReport?.analytics);
+  const reportSummary = buildReportSummary(latestReport);
+  const weeklyLoadSeries = buildWeeklyLoadSeriesSlice(latestReport?.analytics);
 
   const suggestedPrompts = [...DEFAULT_SUGGESTED_PROMPTS];
   if (nextSession?.title) {
@@ -157,10 +222,15 @@ async function buildChatContext(userId, user = {}) {
       weeklyTrainingLoadKm: user.weeklyTrainingLoadKm || null
     },
     nextSession,
+    weeklyPlan,
+    keyMetrics,
+    reportSummary,
+    weeklyLoadSeries,
     trainingLoad,
     suggestedPrompts,
     hasUnreadCoachNudge: hasUnreadCoachNudge > 0,
-    reportId: latestReport?._id || null
+    reportId: latestReport?._id || null,
+    lastSyncAt: lastActivity?.date || lastSession?.date || null
   };
 }
 
@@ -172,6 +242,7 @@ async function getChatHistory(userId, limit = DEFAULT_HISTORY_LIMIT) {
     id: m._id,
     role: m.role,
     content: m.content,
+    richContent: m.richContent || undefined,
     createdAt: m.createdAt
   }));
 }
@@ -192,7 +263,7 @@ function truncateForOpenAI(text, maxLen = MAX_USER_MESSAGE_CHARS) {
 }
 
 function buildChatContextForOpenAI(context) {
-  const { lastSession, userProfile, nextSession } = context;
+  const { lastSession, userProfile, nextSession, weeklyPlan, keyMetrics } = context;
 
   return {
     lastSession: lastSession
@@ -217,6 +288,19 @@ function buildChatContextForOpenAI(context) {
           title: nextSession.title,
           durationMinutes: nextSession.durationMinutes,
           objective: nextSession.objective || null
+        }
+      : null,
+    weeklyPlan: (weeklyPlan || []).slice(0, 7).map((day) => {
+      const dist = day.distanceKm != null ? `${day.distanceKm} km` : '';
+      const dur = day.durationMinutes != null ? `${day.durationMinutes} min` : '';
+      const meta = [dur, dist].filter(Boolean).join(', ');
+      return meta ? `${day.title} (${meta})` : day.title;
+    }),
+    keyMetrics: keyMetrics
+      ? {
+          acwr: keyMetrics.acwr,
+          weeklyLoad: keyMetrics.weeklyLoad,
+          totalDistanceKm: keyMetrics.totalDistanceKm
         }
       : null
   };
@@ -470,36 +554,251 @@ function buildDefaultCoachReply(lastSession, nextSession) {
   return reply;
 }
 
+function detectRichContentIntent(message) {
+  const msg = String(message || '').trim().toLowerCase();
+
+  if (/\brecommendations\b/.test(msg)) {
+    return 'recommendations';
+  }
+  if (/recommendation|next session|what should i do|what's my next/.test(msg)) {
+    return 'next_session';
+  }
+  if (/show my weekly report|\breport\b|weekly summary|how am i doing/.test(msg)) {
+    return 'report_summary';
+  }
+  if (/\bplan\b|7.?day|seven day|this week|explain my 7/.test(msg)) {
+    return 'weekly_plan';
+  }
+  if (/\bload\b|\bacwr\b|training load/.test(msg)) {
+    return 'metrics';
+  }
+
+  return 'none';
+}
+
+function buildRichContent(intent, context) {
+  const {
+    weeklyPlan = [],
+    keyMetrics,
+    reportSummary,
+    nextSession,
+    weeklyLoadSeries = []
+  } = context;
+
+  switch (intent) {
+    case 'metrics':
+      return {
+        type: 'metrics',
+        data: {
+          keyMetrics: keyMetrics || {},
+          weeklyLoadSeries
+        }
+      };
+    case 'weekly_plan':
+      return {
+        type: 'weekly_plan',
+        data: { days: weeklyPlan }
+      };
+    case 'report_summary':
+      return {
+        type: 'report_summary',
+        data: reportSummary || {
+          headline: 'No weekly report yet',
+          readinessPhase: 'build',
+          executiveParagraph: 'Generate a training report to unlock executive summary insights.',
+          injuryRiskLevel: 'low',
+          reportGeneratedAt: null
+        }
+      };
+    case 'next_session':
+      return {
+        type: 'next_session',
+        data: {
+          session: nextSession,
+          firstPlanDay: weeklyPlan[0] || null
+        }
+      };
+    case 'recommendations':
+      return {
+        type: 'weekly_plan',
+        data: {
+          days: weeklyPlan,
+          highlightNextSession: nextSession
+        }
+      };
+    default:
+      return { type: 'none', data: null };
+  }
+}
+
+function attachRichContent(result, message, context) {
+  const intent = detectRichContentIntent(message);
+  const richContent = buildRichContent(intent, context);
+  return {
+    ...result,
+    richContent: richContent.type === 'none' ? { type: 'none', data: null } : richContent
+  };
+}
+
+function buildTrainingLoadSummary(keyMetrics) {
+  if (!keyMetrics) {
+    return 'No training load data yet — sync runs and generate a report to see ACWR and weekly load.';
+  }
+
+  const {
+    acwr = 0,
+    weeklyLoad = 0,
+    monotony = 0,
+    totalDistanceKm = 0,
+    runsPerWeek = 0
+  } = keyMetrics;
+
+  const parts = [
+    `Weekly load is ${weeklyLoad} TRIMP-style units over the report window (${totalDistanceKm} km total, ~${runsPerWeek} runs/week).`
+  ];
+
+  if (acwr > 0) {
+    let acwrNote = 'in a healthy progression zone';
+    if (acwr > 1.5) {
+      acwrNote = 'elevated — prioritize recovery and avoid stacking hard days';
+    } else if (acwr < 0.8) {
+      acwrNote = 'conservative — you have room to build gradually';
+    }
+    parts.push(`ACWR (acute:chronic workload ratio) is ${acwr}, which is ${acwrNote}.`);
+  }
+
+  if (monotony > 0) {
+    parts.push(
+      monotony > 2
+        ? `Monotony is ${monotony} — load is spread too uniformly; add a true rest day.`
+        : `Monotony is ${monotony}, which looks sustainable.`
+    );
+  }
+
+  return parts.join(' ');
+}
+
+function buildReportSummaryReply(reportSummary, keyMetrics) {
+  if (!reportSummary) {
+    return 'No weekly report on file yet. Generate a training report from the dashboard to unlock executive summary and metrics.';
+  }
+
+  const parts = [
+    reportSummary.headline,
+    reportSummary.executiveParagraph,
+    `Readiness phase: ${reportSummary.readinessPhase}. Injury risk: ${reportSummary.injuryRiskLevel}.`
+  ];
+
+  if (keyMetrics) {
+    parts.push(
+      `Key numbers — ${keyMetrics.totalDistanceKm} km total, ACWR ${keyMetrics.acwr}, weekly load ${keyMetrics.weeklyLoad}.`
+    );
+  }
+
+  return parts.filter(Boolean).join('\n\n');
+}
+
+function buildWeeklyPlanListReply(weeklyPlan, nextSession) {
+  if (!weeklyPlan?.length) {
+    return nextSession
+      ? buildNextSessionSummary(nextSession)
+      : 'No 7-day plan yet — generate a weekly report to get structured sessions.';
+  }
+
+  const lines = weeklyPlan.map((day, index) => {
+    const type = day.sessionType ? day.sessionType.replace(/_/g, ' ') : 'session';
+    const dur = day.durationMinutes ? `${day.durationMinutes} min` : '—';
+    const dist = day.distanceKm != null ? `${day.distanceKm} km` : '—';
+    return `${index + 1}. ${day.title} — ${type}, ${dur}, ${dist}`;
+  });
+
+  let reply = `Your 7-day plan:\n${lines.join('\n')}`;
+  if (nextSession?.title) {
+    reply += `\n\nNext up: ${nextSession.title}.`;
+  }
+  return reply;
+}
+
+function buildRecommendationsReply(weeklyPlan, nextSession) {
+  const planIntro = weeklyPlan?.length
+    ? `This week includes ${weeklyPlan.length} planned sessions — mix of easy, quality, and recovery days.`
+    : 'Generate a report to unlock your full weekly recommendations.';
+
+  const nextPart = nextSession?.title
+    ? `Your immediate next session is "${nextSession.title}"${nextSession.durationMinutes ? ` (~${nextSession.durationMinutes} min)` : ''}.`
+    : '';
+
+  return [planIntro, nextPart, buildWeeklyPlanListReply(weeklyPlan, null)].filter(Boolean).join('\n\n');
+}
+
+function buildNextSessionRichReply(nextSession, weeklyPlan) {
+  const sessionPart = buildNextSessionSummary(nextSession);
+  const dayOne = weeklyPlan?.[0];
+  if (dayOne?.title && dayOne.title !== nextSession?.title) {
+    return `${sessionPart}\n\nDay 1 of your plan: ${dayOne.title}${dayOne.durationMinutes ? ` (${dayOne.durationMinutes} min)` : ''}.`;
+  }
+  return sessionPart;
+}
+
 function buildRuleBasedCoachReply(message, context, options = {}) {
   const msg = String(message || '').trim().toLowerCase();
-  const { lastSession, nextSession, trainingLoad } = context;
+  const {
+    lastSession,
+    nextSession,
+    trainingLoad,
+    keyMetrics,
+    weeklyPlan,
+    reportSummary
+  } = context;
 
-  if (!lastSession) {
+  const intent = detectRichContentIntent(message);
+  let richContent = buildRichContent(intent, context);
+
+  const dataOnlyIntent = intent !== 'none';
+  if (!lastSession && !dataOnlyIntent) {
     return {
       reply: 'Sync a run from Strava first, then I can discuss your training.',
-      source: 'rules'
+      source: 'rules',
+      richContent: { type: 'none', data: null }
     };
   }
 
   let reply;
 
-  if (/plan|tomorrow|next session/.test(msg)) {
-    reply = buildNextSessionSummary(nextSession);
+  if (/\bload\b|\bacwr\b|training load/.test(msg)) {
+    reply = buildTrainingLoadSummary(keyMetrics || trainingLoad);
+  } else if (/show my weekly report|\breport\b|weekly summary|how am i doing/.test(msg)) {
+    reply = buildReportSummaryReply(reportSummary, keyMetrics);
+  } else if (/\bplan\b|7.?day|seven day|this week|explain my 7/.test(msg)) {
+    reply = buildWeeklyPlanListReply(weeklyPlan, nextSession);
+  } else if (/\brecommendations\b/.test(msg)) {
+    reply = buildRecommendationsReply(weeklyPlan, nextSession);
+  } else if (/recommendation|next session|what should i do|what's my next/.test(msg)) {
+    reply = buildNextSessionRichReply(nextSession, weeklyPlan);
+  } else if (/plan|tomorrow|next session/.test(msg)) {
+    reply = buildNextSessionRichReply(nextSession, weeklyPlan);
   } else if (/how was|last (run|session)/.test(msg)) {
     reply = buildLastRunSummary(lastSession);
+    richContent = { type: 'none', data: null };
   } else if (/effort|rpe|hard/.test(msg)) {
     reply = buildEffortExplanation(lastSession);
-  } else if (/improve|what should|\bnext\b/.test(msg)) {
-    reply = buildImprovementSuggestions(lastSession, trainingLoad);
+    richContent = { type: 'none', data: null };
+  } else if (/improve|what should/.test(msg)) {
+    reply = buildImprovementSuggestions(lastSession, trainingLoad || keyMetrics);
+    richContent = { type: 'none', data: null };
+  } else if (!lastSession) {
+    reply = 'Sync a run from Strava first, then I can discuss your training.';
+    richContent = { type: 'none', data: null };
   } else {
     reply = buildDefaultCoachReply(lastSession, nextSession);
+    richContent = { type: 'none', data: null };
   }
 
   if (options.openAiFailed) {
     reply += `\n\n${RULES_OFFLINE_NOTE}`;
   }
 
-  return { reply, source: 'rules' };
+  return { reply, source: 'rules', richContent };
 }
 
 async function callOpenAI(systemPrompt, chatMessages) {
@@ -540,24 +839,29 @@ function matchesSuggestedPrompt(message, suggestedPrompts = []) {
 async function generateCoachReply(message, context, systemPrompt, chatMessages) {
   const apiKey = process.env.OPENAI_API_KEY && String(process.env.OPENAI_API_KEY).trim();
 
+  let result;
+
   if (matchesSuggestedPrompt(message, context.suggestedPrompts)) {
-    return buildRuleBasedCoachReply(message, context);
+    result = buildRuleBasedCoachReply(message, context);
+  } else if (shouldUseRuleBasedFirst(message)) {
+    result = buildRuleBasedCoachReply(message, context);
+  } else if (!apiKey) {
+    result = buildRuleBasedCoachReply(message, context);
+  } else {
+    try {
+      result = await callOpenAI(systemPrompt, chatMessages);
+      result = attachRichContent(result, message, context);
+    } catch (error) {
+      console.error('Coach chat OpenAI failed:', error.message || error);
+      result = buildRuleBasedCoachReply(message, context, { openAiFailed: true });
+    }
   }
 
-  if (shouldUseRuleBasedFirst(message)) {
-    return buildRuleBasedCoachReply(message, context);
+  if (!result.richContent) {
+    result = attachRichContent(result, message, context);
   }
 
-  if (!apiKey) {
-    return buildRuleBasedCoachReply(message, context);
-  }
-
-  try {
-    return await callOpenAI(systemPrompt, chatMessages);
-  } catch (error) {
-    console.error('Coach chat OpenAI failed:', error.message || error);
-    return buildRuleBasedCoachReply(message, context, { openAiFailed: true });
-  }
+  return result;
 }
 
 async function sendChatMessage(userId, user, message) {
@@ -611,17 +915,27 @@ async function sendChatMessage(userId, user, message) {
 
   let reply;
   let source;
+  let richContent = { type: 'none', data: null };
 
   if (cachedReply) {
     reply = cachedReply;
     source = 'cache';
+    richContent = buildRichContent(detectRichContentIntent(trimmed), context);
+    if (richContent.type === 'none') {
+      richContent = { type: 'none', data: null };
+    }
   } else {
     const systemPrompt = buildSystemPrompt(context);
     const historyForAi = prepareChatHistoryForOpenAI(doc.messages);
-    ({ reply, source } = await generateCoachReply(trimmed, context, systemPrompt, historyForAi));
+    ({ reply, source, richContent } = await generateCoachReply(trimmed, context, systemPrompt, historyForAi));
   }
 
-  const assistantMsg = { role: 'assistant', content: reply, createdAt: new Date() };
+  const assistantMsg = {
+    role: 'assistant',
+    content: reply,
+    richContent: richContent?.type && richContent.type !== 'none' ? richContent : undefined,
+    createdAt: new Date()
+  };
   doc.messages.push(assistantMsg);
 
   if (doc.messages.length > MAX_STORED_MESSAGES) {
@@ -641,10 +955,16 @@ async function sendChatMessage(userId, user, message) {
     id: m._id,
     role: m.role,
     content: m.content,
+    richContent: m.richContent || undefined,
     createdAt: m.createdAt
   }));
 
-  return { reply, source, messages: recentMessages };
+  return {
+    reply,
+    source,
+    richContent: richContent?.type && richContent.type !== 'none' ? richContent : { type: 'none', data: null },
+    messages: recentMessages
+  };
 }
 
 module.exports = {
@@ -655,6 +975,8 @@ module.exports = {
   buildChatContext,
   buildChatContextForOpenAI,
   buildSystemPrompt,
+  buildRichContent,
+  detectRichContentIntent,
   getChatHistory,
   sendChatMessage,
   countRecentUserMessages,

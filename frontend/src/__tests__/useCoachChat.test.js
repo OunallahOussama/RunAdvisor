@@ -120,4 +120,46 @@ describe('useCoachChat', () => {
 
     expect(result.current.error).toMatch(/too many|rate limit|later/i);
   });
+
+  it('stores richContent on assistant message from send response', async () => {
+    coachChatApi.sendMessage.mockResolvedValue({
+      data: {
+        success: true,
+        reply: 'Here is your report.',
+        source: 'rules',
+        richContent: {
+          type: 'report_summary',
+          data: { headline: 'Solid week', readinessPhase: 'build' }
+        },
+        messages: [
+          { id: '1', role: 'user', content: 'Show my weekly report', createdAt: '2026-05-24T10:00:00.000Z' },
+          {
+            id: '2',
+            role: 'assistant',
+            content: 'Here is your report.',
+            richContent: {
+              type: 'report_summary',
+              data: { headline: 'Solid week', readinessPhase: 'build' }
+            },
+            createdAt: '2026-05-24T10:00:01.000Z'
+          }
+        ]
+      }
+    });
+
+    const { result } = renderHook(() => useCoachChat({ enabled: true }));
+
+    await act(async () => {
+      await result.current.sendMessage('Show my weekly report');
+    });
+
+    await waitFor(() => {
+      expect(result.current.sending).toBe(false);
+    });
+
+    expect(result.current.messages[1].richContent).toEqual({
+      type: 'report_summary',
+      data: { headline: 'Solid week', readinessPhase: 'build' }
+    });
+  });
 });

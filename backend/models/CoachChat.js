@@ -10,6 +10,10 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  richContent: {
+    type: mongoose.Schema.Types.Mixed,
+    default: undefined
+  },
   createdAt: {
     type: Date,
     default: Date.now

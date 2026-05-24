@@ -36,6 +36,9 @@ function buildMessagesFromSendResponse(data, optimistic, trimmed) {
   }
 
   const reply = String(data?.reply || '').trim();
+  const richContent = data?.richContent?.type && data.richContent.type !== 'none'
+    ? data.richContent
+    : undefined;
   const userMessage = {
     id: optimistic.id,
     role: 'user',
@@ -46,6 +49,7 @@ function buildMessagesFromSendResponse(data, optimistic, trimmed) {
     id: `assistant-${Date.now()}`,
     role: 'assistant',
     content: reply || "Coach couldn't generate a reply. Please try again.",
+    richContent,
     createdAt: new Date().toISOString()
   };
 
