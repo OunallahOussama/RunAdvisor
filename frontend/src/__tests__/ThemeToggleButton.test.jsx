@@ -21,9 +21,28 @@ beforeAll(() => {
 describe('ThemeToggleButton', () => {
   beforeEach(() => {
     window.localStorage.clear();
+    document.documentElement.dataset.theme = '';
   });
 
-  it('opens a menu with system / light / dark options', () => {
+  it('shows moon icon in light mode and sun icon in dark mode', () => {
+    window.localStorage.setItem(THEME_PREFERENCE_KEY, 'light');
+
+    render(
+      <ThemeProvider>
+        <ThemeToggleButton />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByTestId('theme-icon-dark')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('theme-toggle-button'));
+
+    expect(screen.getByTestId('theme-icon-light')).toBeInTheDocument();
+  });
+
+  it('persists the toggled mode to localStorage and updates document data-theme', () => {
+    window.localStorage.setItem(THEME_PREFERENCE_KEY, 'light');
+
     render(
       <ThemeProvider>
         <ThemeToggleButton />
@@ -31,27 +50,36 @@ describe('ThemeToggleButton', () => {
     );
 
     fireEvent.click(screen.getByTestId('theme-toggle-button'));
-
-    expect(screen.getByTestId('theme-option-system')).toBeInTheDocument();
-    expect(screen.getByTestId('theme-option-light')).toBeInTheDocument();
-    expect(screen.getByTestId('theme-option-dark')).toBeInTheDocument();
-  });
-
-  it('persists the user choice to localStorage and updates document data-theme', () => {
-    render(
-      <ThemeProvider>
-        <ThemeToggleButton />
-      </ThemeProvider>
-    );
-
-    fireEvent.click(screen.getByTestId('theme-toggle-button'));
-    fireEvent.click(screen.getByTestId('theme-option-dark'));
 
     expect(window.localStorage.getItem(THEME_PREFERENCE_KEY)).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
 
     fireEvent.click(screen.getByTestId('theme-toggle-button'));
-    fireEvent.click(screen.getByTestId('theme-option-light'));
+
+    expect(window.localStorage.getItem(THEME_PREFERENCE_KEY)).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  it('toggles from system-resolved dark to explicit light on first click', () => {
+    window.localStorage.setItem(THEME_PREFERENCE_KEY, 'system');
+    window.matchMedia = jest.fn().mockImplementation(() => ({
+      matches: true,
+      media: '(prefers-color-scheme: dark)',
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {}
+    }));
+
+    render(
+      <ThemeProvider>
+        <ThemeToggleButton />
+      </ThemeProvider>
+    );
+
+    expect(screen.getByTestId('theme-icon-light')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('theme-toggle-button'));
 
     expect(window.localStorage.getItem(THEME_PREFERENCE_KEY)).toBe('light');
     expect(document.documentElement.dataset.theme).toBe('light');

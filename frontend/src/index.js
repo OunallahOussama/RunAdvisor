@@ -46,7 +46,7 @@ root.render(
           }}
         >
           <Box sx={{ position: 'absolute', right: 16, top: 16 }}>
-            <ThemeToggleButton compact />
+            <ThemeToggleButton size="small" />
           </Box>
           <Paper elevation={3} sx={{ maxWidth: 520, width: 1, p: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>

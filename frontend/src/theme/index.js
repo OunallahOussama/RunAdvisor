@@ -1,4 +1,4 @@
-import { createTheme } from '@mui/material/styles';
+import { alpha, createTheme } from '@mui/material/styles';
 
 /**
  * Material Design 3 theme factory for RunAdvisor.
@@ -169,6 +169,8 @@ function buildComponents(palette) {
       defaultProps: { elevation: 0 },
       styleOverrides: {
         root: {
+          backgroundColor: palette.background.paper,
+          color: palette.text.primary,
           backgroundImage: 'none'
         },
         rounded: { borderRadius: 16 }
@@ -228,7 +230,10 @@ function buildComponents(palette) {
           fontWeight: 600,
           height: 28
         },
-        sizeSmall: { height: 24 }
+        sizeSmall: { height: 24 },
+        outlined: {
+          borderColor: palette.outline
+        }
       }
     },
     MuiTextField: {
@@ -286,8 +291,51 @@ function buildComponents(palette) {
     MuiAlert: {
       styleOverrides: {
         root: {
-          borderRadius: 12
+          borderRadius: 12,
+          color: palette.text.primary
+        },
+        standardSuccess: {
+          backgroundColor: alpha(palette.success.main, isDark ? 0.16 : 0.12),
+          color: isDark ? palette.success.light : palette.success.dark
+        },
+        standardInfo: {
+          backgroundColor: alpha(palette.info.main, isDark ? 0.16 : 0.12),
+          color: isDark ? palette.info.light : palette.info.dark
+        },
+        standardWarning: {
+          backgroundColor: alpha(palette.warning.main, isDark ? 0.16 : 0.12),
+          color: isDark ? palette.warning.light : palette.warning.dark
+        },
+        standardError: {
+          backgroundColor: alpha(palette.error.main, isDark ? 0.16 : 0.12),
+          color: isDark ? palette.error.light : palette.error.dark
         }
+      }
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: palette.background.paper,
+          color: palette.text.primary,
+          backgroundImage: 'none'
+        }
+      }
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          borderColor: palette.divider,
+          color: palette.text.primary
+        },
+        head: {
+          color: palette.text.secondary,
+          fontWeight: 600
+        }
+      }
+    },
+    MuiTypography: {
+      defaultProps: {
+        color: 'textPrimary'
       }
     },
     MuiTabs: {
