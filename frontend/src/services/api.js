@@ -143,7 +143,10 @@ export const recommendationsApi = {
       params: { days, raceDistance, raceDate, raceName }
     }),
   getSimilarActivities: (activityId, limit = 5) => api.post('/recommendations/similar', { activityId, limit }),
-  updateRecommendation: (id, status, feedback) => api.put(`/recommendations/${id}`, { status, feedback })
+  updateRecommendation: (id, status, feedback) => api.put(`/recommendations/${id}`, { status, feedback }),
+  generateReport: ({ windowDays = 84, raceDistance, raceDate, raceName } = {}) =>
+    api.post('/recommendations/report', { windowDays, raceDistance, raceDate, raceName }, { timeout: 90_000 }),
+  getLatestReport: () => api.get('/recommendations/report/latest')
 };
 
 // Vector search endpoints
@@ -154,7 +157,25 @@ export const vectorSearchApi = {
 };
 
 export const coachApi = {
-  weeklySummary: (days = 28) => api.post('/coach/weekly-summary', { days }),
+  /**
+   * Generate or fetch the cached Smart Weekly Summary report.
+   * Accepts either `weeklySummary(7)` (legacy: number of days) or
+   * `weeklySummary({ windowDays: 7, force: true })`. Returns the full
+   * structured payload: { analytics, report, summary, headline, ... }.
+   */
+  weeklySummary: (options = {}) => {
+    const opts =
+      typeof options === 'number'
+        ? { windowDays: options }
+        : options || {};
+    const windowDays = Number(opts.windowDays) || 7;
+    const force = Boolean(opts.force);
+    return api.post(
+      '/coach/weekly-summary',
+      { windowDays, force },
+      { timeout: 90_000 }
+    );
+  },
   semanticSearch: (q) => api.get('/coach/semantic-search', { params: { q } }),
   trackUsage: (event, metadata) => api.post('/coach/track-usage', { event, metadata })
 };
@@ -164,6 +185,23 @@ export const adminApi = {
   getOverview: (days = 7) => api.get('/admin/overview', { params: { days } }),
   getUsage: (days = 7) => api.get('/admin/usage', { params: { days } }),
   getInsights: (days = 7) => api.get('/admin/insights', { params: { days } })
+};
+
+// Users (consent + onboarding) endpoints
+export const usersApi = {
+  getMe: () => api.get('/users/me'),
+  getConsent: () => api.get('/users/me/consent'),
+  updateConsent: (payload) => api.put('/users/me/consent', payload),
+  completeOnboarding: ({ runningGoal, reset } = {}) =>
+    api.put('/users/me/onboarding-complete', { runningGoal, reset })
+};
+
+// Notification center endpoints
+export const notificationsApi = {
+  list: ({ unread = false, limit = 20 } = {}) =>
+    api.get('/notifications', { params: { unread: unread ? 'true' : undefined, limit } }),
+  markRead: (id) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all')
 };
 
 export default api;

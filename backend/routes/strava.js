@@ -10,6 +10,7 @@ const {
   prepareUserForStravaApi,
   stravaAxios
 } = require('../utils/stravaCredentials');
+const { createNotification } = require('../services/notificationService');
 
 const router = express.Router();
 const MAX_TRAINING_PLAN_BYTES = 2 * 1024 * 1024;
@@ -206,12 +207,58 @@ function buildActivityUpdate(userId, activity) {
     avgHeartRate: activity.average_heartrate,
     maxHeartRate: activity.max_heartrate,
     avgCadence: activity.average_cadence,
+    maxCadence: activity.max_cadence,
+    averageSpeed: activity.average_speed,
+    maxSpeed: activity.max_speed,
+    averageWatts: activity.average_watts,
+    maxWatts: activity.max_watts,
+    weightedAverageWatts: activity.weighted_average_watts,
+    kilojoules: activity.kilojoules,
+    sufferScore: activity.suffer_score,
+    calories: activity.calories,
+    workoutType: activity.workout_type,
+    achievementCount: activity.achievement_count,
+    prCount: activity.pr_count,
+    startDateLocal: activity.start_date_local ? new Date(activity.start_date_local) : undefined,
+    timezone: activity.timezone,
     date: new Date(activity.start_date),
     polyline: activity.map?.summary_polyline || activity.map?.polyline,
     performanceVector: generatePerformanceVector(activity),
     notes: activity.description,
     visibility: visibilityFromStravaActivity(activity)
   };
+
+  if (Array.isArray(activity.splits_metric) && activity.splits_metric.length) {
+    update.splitsMetric = activity.splits_metric.map((split, index) => ({
+      split: split.split != null ? split.split : index + 1,
+      distance: split.distance,
+      elapsed_time: split.elapsed_time,
+      moving_time: split.moving_time,
+      elevation_difference: split.elevation_difference,
+      average_speed: split.average_speed,
+      average_heartrate: split.average_heartrate,
+      pace_zone: split.pace_zone
+    }));
+  }
+
+  if (Array.isArray(activity.laps) && activity.laps.length) {
+    update.laps = activity.laps.map((lap) => ({
+      id: lap.id,
+      name: lap.name,
+      lap_index: lap.lap_index,
+      distance: lap.distance,
+      elapsed_time: lap.elapsed_time,
+      moving_time: lap.moving_time,
+      average_speed: lap.average_speed,
+      max_speed: lap.max_speed,
+      average_heartrate: lap.average_heartrate,
+      max_heartrate: lap.max_heartrate,
+      average_cadence: lap.average_cadence,
+      total_elevation_gain: lap.total_elevation_gain,
+      start_index: lap.start_index,
+      end_index: lap.end_index
+    }));
+  }
 
   update.semanticVector = buildSemanticVector(update);
 
@@ -250,6 +297,20 @@ async function syncRecentActivitiesForUser(userId, user, accessToken, limit = 20
 
   user.stravaLastSyncAt = new Date();
   await user.save();
+
+  try {
+    if (savedActivities.length > 0) {
+      await createNotification(userId, {
+        type: 'strava_sync_completed',
+        title: `Synced ${savedActivities.length} Strava activit${savedActivities.length === 1 ? 'y' : 'ies'}`,
+        body: 'Your latest runs are up to date in RunAdvisor.',
+        severity: 'info',
+        data: { syncedCount: savedActivities.length, route: '/activities' }
+      });
+    }
+  } catch (notifyError) {
+    console.error('Strava sync notification failed:', notifyError.message || notifyError);
+  }
 
   return {
     syncedCount: savedActivities.length,
