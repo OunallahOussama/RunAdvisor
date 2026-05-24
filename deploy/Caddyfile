@@ -1,0 +1,67 @@
+# RunAdvisor Caddy reverse proxy
+# ---------------------------------------------------------------------------
+# Caddy terminates TLS on :443 (auto Let's Encrypt) and proxies:
+#   /api/*  → backend:5000   (Express API)
+#   /health → backend:5000   (liveness probe)
+#   /*      → frontend:3000  (React SPA served by `serve -s build`)
+#
+# Env vars (injected by docker-compose from .env.ec2):
+#   {$DOMAIN}            e.g. runadvisor.example.com
+#   {$LETSENCRYPT_EMAIL} e.g. ops@example.com
+#
+# Caddy auto-redirects HTTP→HTTPS for any named site block, so nothing extra
+# is needed for port 80.
+# ---------------------------------------------------------------------------
+
+{
+	email {$LETSENCRYPT_EMAIL}
+	# Uncomment to test against the staging CA without burning real cert quota:
+	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Strava webhook + REST API + health all live on the backend.
+	@backend path /api/* /health /health/*
+	handle @backend {
+		reverse_proxy backend:5000 {
+			# Backend reads X-Forwarded-* (TRUST_PROXY=1) for rate-limit/usage IPs.
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Forwarded-Host {host}
+			# Smart Weekly Summary + Training Report calls can take a while.
+			transport http {
+				dial_timeout 10s
+				response_header_timeout 120s
+			}
+		}
+	}
+
+	# Everything else is the React SPA.
+	handle {
+		reverse_proxy frontend:3000 {
+			header_up X-Real-IP {remote_host}
+			header_up X-Forwarded-For {remote_host}
+			header_up X-Forwarded-Proto {scheme}
+		}
+	}
+
+	# Reasonable upload size for training-plan JSON (matches backend 3 MB limit).
+	request_body {
+		max_size 10MB
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# OPTIONAL: serve the apex/www alias too. Uncomment + add the matching DNS
+# A record + Auth0/Strava callback entries before enabling.
+#
+# www.{$DOMAIN} {
+# 	redir https://{$DOMAIN}{uri} permanent
+# }

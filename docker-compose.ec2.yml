@@ -1,3 +1,12 @@
+# RunAdvisor production compose file (EC2)
+#
+# Run with:
+#   docker compose --env-file .env.ec2 -f docker-compose.ec2.yml up -d --build
+#
+# Caddy terminates TLS (auto Let's Encrypt) and reverse-proxies to the
+# internal frontend (port 3000) + backend (port 5000). Neither the API nor
+# Mongo are exposed on host ports — everything goes through Caddy on 80/443.
+
 services:
   mongodb:
     image: mongo:7.0
@@ -9,11 +18,14 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-runadvisor}
     volumes:
       - mongodb-data:/data/db
+      - ./docker/init-mongodb.js:/docker-entrypoint-initdb.d/init.js:ro
+    # NOTE: no `ports:` on EC2 — Mongo stays on the docker network only.
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      test: ["CMD-SHELL", "echo 'db.runCommand(\"ping\").ok' | mongosh --quiet localhost:27017/test"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
     networks:
       - runadvisor-network
 
@@ -39,20 +51,26 @@ services:
       STRAVA_TOKEN_ENCRYPTION_KEY: ${STRAVA_TOKEN_ENCRYPTION_KEY:-}
       STRAVA_WEBHOOK_VERIFY_TOKEN: ${STRAVA_WEBHOOK_VERIFY_TOKEN:-}
       STRAVA_WEBHOOK_SIGNING_SECRET: ${STRAVA_WEBHOOK_SIGNING_SECRET:-}
-      STRAVA_WEBHOOK_SKIP_SIGNATURE: ${STRAVA_WEBHOOK_SKIP_SIGNATURE:-}
+      STRAVA_WEBHOOK_SKIP_SIGNATURE: ${STRAVA_WEBHOOK_SKIP_SIGNATURE:-0}
+      STRAVA_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS: ${STRAVA_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS:-300}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       ADMIN_AUTH0_IDS: ${ADMIN_AUTH0_IDS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
-      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-300}
+      RATE_LIMIT_AUTH_MAX: ${RATE_LIMIT_AUTH_MAX:-60}
+      RATE_LIMIT_STRAVA_MAX: ${RATE_LIMIT_STRAVA_MAX:-120}
+      RATE_LIMIT_STRAVA_WEBHOOK_MAX: ${RATE_LIMIT_STRAVA_WEBHOOK_MAX:-120}
       USAGE_EVENT_TTL_DAYS: ${USAGE_EVENT_TTL_DAYS:-90}
+      REACT_APP_SITE_URL: ${REACT_APP_SITE_URL:-https://${DOMAIN}}
     depends_on:
       mongodb:
         condition: service_healthy
-    # Bind API only on localhost for host Nginx (must match proxy_pass in nginx)
-    ports:
-      - "127.0.0.1:5000:5000"
+    # No host port: Caddy reaches us via the docker network on :5000.
+    expose:
+      - "5000"
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => { process.exit(r.statusCode === 200 ? 0 : 1); }).on('error', () => process.exit(1));"]
       interval: 30s
@@ -68,26 +86,62 @@ services:
       dockerfile: Dockerfile
       args:
         REACT_APP_API_BASE_URL: ${REACT_APP_API_BASE_URL}
-        REACT_APP_AUTH0_DOMAIN: ${AUTH0_DOMAIN}
-        REACT_APP_AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID}
-        REACT_APP_AUTH0_AUDIENCE: ${AUTH0_AUDIENCE}
+        REACT_APP_AUTH0_DOMAIN: ${REACT_APP_AUTH0_DOMAIN:-${AUTH0_DOMAIN}}
+        REACT_APP_AUTH0_CLIENT_ID: ${REACT_APP_AUTH0_CLIENT_ID:-${AUTH0_CLIENT_ID}}
+        REACT_APP_AUTH0_AUDIENCE: ${REACT_APP_AUTH0_AUDIENCE:-${AUTH0_AUDIENCE}}
         REACT_APP_AUTH0_CALLBACK_URL: ${REACT_APP_AUTH0_CALLBACK_URL}
         REACT_APP_SITE_URL: ${REACT_APP_SITE_URL:-${REACT_APP_AUTH0_CALLBACK_URL}}
-        REACT_APP_STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID}
-        REACT_APP_STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI}
+        REACT_APP_STRAVA_CLIENT_ID: ${REACT_APP_STRAVA_CLIENT_ID:-${STRAVA_CLIENT_ID}}
+        REACT_APP_STRAVA_REDIRECT_URI: ${REACT_APP_STRAVA_REDIRECT_URI:-${STRAVA_REDIRECT_URI}}
     container_name: runadvisor-frontend
     restart: unless-stopped
     depends_on:
       backend:
         # Frontend is static and can start even if backend healthcheck is delayed.
         condition: service_started
+    # No host port: Caddy reaches us via the docker network on :3000.
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - runadvisor-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: runadvisor-caddy
+    restart: unless-stopped
     ports:
-      - "8080:3000"
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      DOMAIN: ${DOMAIN}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - runadvisor-network
 
 volumes:
   mongodb-data:
+  caddy-data:
+  caddy-config:
 
 networks:
   runadvisor-network:
