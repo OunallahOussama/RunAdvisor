@@ -11,6 +11,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,6 +25,10 @@ import {
 } from 'chart.js';
 import { Bar, Line } from 'react-chartjs-2';
 import { recommendationsApi } from '../services/api';
+import WeeklyPlanDayCard from '../components/WeeklyPlanDayCard';
+import { DAY_LABELS } from '../utils/weeklyPlanShared';
+import { chartScaleOptions, getChartTheme } from '../utils/chartTheme';
+import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 
 ChartJS.register(
   CategoryScale,
@@ -42,8 +47,6 @@ const WINDOW_OPTIONS = [
   { value: 84, label: 'Last 12 weeks' },
   { value: 120, label: 'Last 4 months' }
 ];
-
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 function paceLabel(minPerKm) {
   const v = Number(minPerKm);
@@ -78,20 +81,49 @@ function formatDate(value) {
   }
 }
 
+function reportCardSx(extra = {}) {
+  return {
+    borderRadius: 4,
+    border: 1,
+    borderColor: 'divider',
+    bgcolor: 'background.paper',
+    color: 'text.primary',
+    ...extra
+  };
+}
+
 function StatCard({ label, value, sublabel, tone = 'default', tooltip }) {
+  const theme = useTheme();
   const toneStyles = {
-    default: 'bg-white border-slate-200',
-    good: 'bg-emerald-50 border-emerald-200',
-    warn: 'bg-amber-50 border-amber-200',
-    risk: 'bg-rose-50 border-rose-200'
+    default: {},
+    good: {
+      bgcolor: alpha(theme.palette.success.main, theme.palette.mode === 'dark' ? 0.14 : 0.1),
+      borderColor: alpha(theme.palette.success.main, 0.35)
+    },
+    warn: {
+      bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.14 : 0.12),
+      borderColor: alpha(theme.palette.warning.main, 0.35)
+    },
+    risk: {
+      bgcolor: alpha(theme.palette.error.main, theme.palette.mode === 'dark' ? 0.14 : 0.1),
+      borderColor: alpha(theme.palette.error.main, 0.35)
+    }
   };
 
   const card = (
-    <div className={`rounded-2xl border ${toneStyles[tone] || toneStyles.default} p-4 flex flex-col gap-1 min-h-[110px]`}>
-      <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold">{label}</div>
-      <div className="text-2xl font-bold text-slate-900 leading-tight">{value}</div>
-      {sublabel ? <div className="text-xs text-slate-500">{sublabel}</div> : null}
-    </div>
+    <Box sx={{ ...reportCardSx({ p: 2, display: 'flex', flexDirection: 'column', gap: 0.5, minHeight: 110 }), ...toneStyles[tone] }}>
+      <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600 }}>
+        {label}
+      </Typography>
+      <Typography variant="h4" fontWeight={700} sx={{ lineHeight: 1.15 }}>
+        {value}
+      </Typography>
+      {sublabel ? (
+        <Typography variant="caption" color="text.secondary">
+          {sublabel}
+        </Typography>
+      ) : null}
+    </Box>
   );
 
   if (!tooltip) {
@@ -100,28 +132,36 @@ function StatCard({ label, value, sublabel, tone = 'default', tooltip }) {
 
   return (
     <Tooltip title={tooltip} placement="top" arrow>
-      <div>{card}</div>
+      <Box>{card}</Box>
     </Tooltip>
   );
 }
 
 function SectionHeader({ number, title, subtitle }) {
   return (
-    <div className="flex items-baseline gap-3 mb-3 mt-6 print:mt-4">
-      <div className="text-3xl font-bold text-orange-500 leading-none">{number}</div>
-      <div>
-        <h2 className="text-xl font-bold text-slate-900 leading-tight">{title}</h2>
-        {subtitle ? <div className="text-sm text-slate-500">{subtitle}</div> : null}
-      </div>
-    </div>
+    <Stack direction="row" alignItems="baseline" spacing={1.5} sx={{ mb: 1.5, mt: 3, '@media print': { mt: 2 } }}>
+      <Typography variant="h3" color="primary.main" fontWeight={700} lineHeight={1}>
+        {number}
+      </Typography>
+      <Box>
+        <Typography variant="h5" fontWeight={700} lineHeight={1.25}>
+          {title}
+        </Typography>
+        {subtitle ? (
+          <Typography variant="body2" color="text.secondary">
+            {subtitle}
+          </Typography>
+        ) : null}
+      </Box>
+    </Stack>
   );
 }
 
 function ChartCard({ children, height = 280 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div style={{ height }}>{children}</div>
-    </div>
+    <Box sx={reportCardSx({ p: 2 })}>
+      <Box sx={{ height }}>{children}</Box>
+    </Box>
   );
 }
 
@@ -157,6 +197,9 @@ function readinessChipColor(phase = '') {
 }
 
 function WeeklyLoadChart({ series }) {
+  const theme = useTheme();
+  const colors = getChartTheme(theme);
+
   const data = {
     labels: series.map((s) => s.label),
     datasets: [
@@ -164,8 +207,8 @@ function WeeklyLoadChart({ series }) {
         type: 'bar',
         label: 'Weekly load',
         data: series.map((s) => s.load),
-        backgroundColor: 'rgba(249, 115, 22, 0.5)',
-        borderColor: '#f97316',
+        backgroundColor: colors.primaryFill,
+        borderColor: colors.primary,
         borderWidth: 1,
         yAxisID: 'load'
       },
@@ -173,8 +216,8 @@ function WeeklyLoadChart({ series }) {
         type: 'line',
         label: 'Distance (km)',
         data: series.map((s) => s.totalDistanceKm),
-        borderColor: '#0ea5e9',
-        backgroundColor: 'rgba(14, 165, 233, 0.18)',
+        borderColor: colors.secondary,
+        backgroundColor: colors.secondaryFill,
         fill: false,
         tension: 0.35,
         yAxisID: 'distance'
@@ -186,17 +229,23 @@ function WeeklyLoadChart({ series }) {
     responsive: true,
     maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { position: 'bottom' } },
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: { color: colors.text }
+      }
+    },
     scales: {
       load: {
         position: 'left',
-        title: { display: true, text: 'Load (TRIMP)' },
-        beginAtZero: true
+        ...chartScaleOptions(theme, { beginAtZero: true }),
+        title: { ...chartScaleOptions(theme).title, text: 'Load (TRIMP)' }
       },
       distance: {
         position: 'right',
-        grid: { drawOnChartArea: false },
-        title: { display: true, text: 'Distance (km)' },
+        grid: { drawOnChartArea: false, color: colors.grid },
+        ticks: { color: colors.text },
+        title: { display: true, text: 'Distance (km)', color: colors.text },
         beginAtZero: true
       }
     }
@@ -206,13 +255,16 @@ function WeeklyLoadChart({ series }) {
 }
 
 function IntensityDistributionChart({ pct }) {
+  const theme = useTheme();
+  const colors = getChartTheme(theme);
+
   const data = {
     labels: ['Easy', 'Tempo', 'Threshold', 'VO2'],
     datasets: [
       {
         label: 'Time in zone (%)',
         data: [pct.easy || 0, pct.tempo || 0, pct.threshold || 0, pct.vo2 || 0],
-        backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#7c3aed']
+        backgroundColor: colors.zones
       }
     ]
   };
@@ -221,22 +273,33 @@ function IntensityDistributionChart({ pct }) {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
-    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => `${v}%` } } }
+    scales: {
+      x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+      y: {
+        beginAtZero: true,
+        max: 100,
+        ticks: { callback: (v) => `${v}%`, color: colors.text },
+        grid: { color: colors.grid }
+      }
+    }
   };
 
   return <Bar data={data} options={options} />;
 }
 
 function PaceTrendChart({ activities }) {
+  const theme = useTheme();
+  const colors = getChartTheme(theme);
   const sorted = [...(activities || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
+
   const data = {
     labels: sorted.map((a) => formatDate(a.date)),
     datasets: [
       {
         label: 'Avg pace (min/km)',
         data: sorted.map((a) => a.avgPaceMinPerKm),
-        borderColor: '#0ea5e9',
-        backgroundColor: 'rgba(14, 165, 233, 0.2)',
+        borderColor: colors.secondary,
+        backgroundColor: colors.secondaryFill,
         fill: true,
         tension: 0.3
       }
@@ -248,9 +311,12 @@ function PaceTrendChart({ activities }) {
     maintainAspectRatio: false,
     plugins: { legend: { display: false } },
     scales: {
+      x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
       y: {
         reverse: true,
-        title: { display: true, text: 'min/km' }
+        ticks: { color: colors.text },
+        grid: { color: colors.grid },
+        title: { display: true, text: 'min/km', color: colors.text }
       }
     }
   };
@@ -259,24 +325,33 @@ function PaceTrendChart({ activities }) {
 }
 
 function SplitsTable({ activities }) {
+  const theme = useTheme();
+  const colors = getChartTheme(theme);
+
   if (!activities || activities.length === 0) {
     return (
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-        Not enough split data yet. Sync more activities from Strava to see per-kilometre commentary.
-      </div>
+      <Box sx={reportCardSx({ p: 3 })}>
+        <Typography variant="body2" color="text.secondary">
+          Not enough split data yet. Sync more activities from Strava to see per-kilometre commentary.
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <Stack spacing={2}>
       {activities.map((a) => (
-        <div key={a.activityId} className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
-            <div>
-              <div className="text-base font-semibold text-slate-900">{a.name || 'Unnamed run'}</div>
-              <div className="text-xs text-slate-500">{formatDate(a.date)} • {fmt(a.distanceKm, ' km', 2)} • {paceLabel(a.avgPaceMinPerKm)}</div>
-            </div>
-            <div className="flex items-center gap-2">
+        <Box key={a.activityId} sx={reportCardSx({ p: 2 })}>
+          <Stack direction="row" flexWrap="wrap" justifyContent="space-between" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={600}>
+                {a.name || 'Unnamed run'}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatDate(a.date)} • {fmt(a.distanceKm, ' km', 2)} • {paceLabel(a.avgPaceMinPerKm)}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <Chip
                 size="small"
                 label={`${a.splitProfile || 'even'} split`}
@@ -292,136 +367,163 @@ function SplitsTable({ activities }) {
                   label={`HR drift ${a.hrDriftBpm > 0 ? '+' : ''}${a.hrDriftBpm} bpm`}
                 />
               ) : null}
-            </div>
-          </div>
+            </Stack>
+          </Stack>
           {a.comment ? (
-            <div className="text-sm text-slate-700 mb-3 italic">{a.comment}</div>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, fontStyle: 'italic' }}>
+              {a.comment}
+            </Typography>
           ) : null}
           {Array.isArray(a.splits) && a.splits.length ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="text-xs uppercase tracking-wide text-slate-500">
-                    <th className="text-left py-1.5 pr-3">Km</th>
-                    <th className="text-left py-1.5 pr-3">Pace</th>
-                    <th className="text-left py-1.5 pr-3">HR</th>
-                    <th className="text-left py-1.5 pr-3">Δ elev</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Box component="table" sx={{ minWidth: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
+                <Box component="thead">
+                  <Box component="tr">
+                    {['Km', 'Pace', 'HR', 'Δ elev'].map((heading) => (
+                      <Box
+                        component="th"
+                        key={heading}
+                        sx={{
+                          textAlign: 'left',
+                          py: 0.75,
+                          pr: 1.5,
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
+                          fontSize: '0.75rem',
+                          color: 'text.secondary',
+                          fontWeight: 600
+                        }}
+                      >
+                        {heading}
+                      </Box>
+                    ))}
+                  </Box>
+                </Box>
+                <Box component="tbody">
                   {(a.splits || []).map((s) => {
                     const isFast = a.fastestKm && s.km === a.fastestKm.km;
                     const isSlow = a.slowestKm && s.km === a.slowestKm.km;
                     return (
-                      <tr
+                      <Box
+                        component="tr"
                         key={s.km}
-                        className={`border-t border-slate-100 ${isFast ? 'bg-emerald-50' : ''} ${isSlow ? 'bg-rose-50' : ''}`}
+                        sx={{
+                          borderTop: 1,
+                          borderColor: 'divider',
+                          bgcolor: isFast ? colors.successFill : isSlow ? colors.errorFill : 'transparent'
+                        }}
                       >
-                        <td className="py-1.5 pr-3 font-medium">{s.km}</td>
-                        <td className="py-1.5 pr-3 font-mono">{paceLabel(s.pace)}</td>
-                        <td className="py-1.5 pr-3">{s.avgHr ?? '—'}</td>
-                        <td className="py-1.5 pr-3">{s.elevDiffM != null ? `${s.elevDiffM} m` : '—'}</td>
-                      </tr>
+                        <Box component="td" sx={{ py: 0.75, pr: 1.5, fontWeight: 500 }}>{s.km}</Box>
+                        <Box component="td" sx={{ py: 0.75, pr: 1.5, fontFamily: 'monospace' }}>{paceLabel(s.pace)}</Box>
+                        <Box component="td" sx={{ py: 0.75, pr: 1.5 }}>{s.avgHr ?? '—'}</Box>
+                        <Box component="td" sx={{ py: 0.75, pr: 1.5 }}>{s.elevDiffM != null ? `${s.elevDiffM} m` : '—'}</Box>
+                      </Box>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                </Box>
+              </Box>
+            </Box>
           ) : (
-            <div className="text-xs text-slate-500">Per-km splits not available for this activity.</div>
+            <Typography variant="caption" color="text.secondary">
+              Per-km splits not available for this activity.
+            </Typography>
           )}
-        </div>
+        </Box>
       ))}
-    </div>
+    </Stack>
   );
 }
 
 function PaceBandPill({ band }) {
+  const theme = useTheme();
   if (!band) {
-    return <span className="text-slate-500">—</span>;
+    return (
+      <Typography component="span" variant="caption" color="text.secondary">
+        —
+      </Typography>
+    );
   }
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 text-xs font-mono border border-sky-200">
+    <Box
+      component="span"
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        px: 1,
+        py: 0.25,
+        borderRadius: 999,
+        bgcolor: alpha(theme.palette.info.main, theme.palette.mode === 'dark' ? 0.18 : 0.1),
+        color: theme.palette.mode === 'dark' ? theme.palette.info.light : theme.palette.info.dark,
+        fontSize: '0.75rem',
+        fontFamily: 'monospace',
+        border: 1,
+        borderColor: alpha(theme.palette.info.main, 0.35)
+      }}
+    >
       {paceLabel(band.lowerMinPerKm)} – {paceLabel(band.upperMinPerKm)}
-    </span>
+    </Box>
   );
 }
 
 function NextSessionCard({ next }) {
+  const theme = useTheme();
   if (!next) {
     return null;
   }
   return (
-    <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5">
-      <div className="text-xs uppercase tracking-wide text-orange-700 font-semibold mb-1">Next session detail</div>
-      <div className="text-xl font-bold text-slate-900 mb-1">{next.title}</div>
+    <Box
+      sx={{
+        ...reportCardSx({ p: 2.5 }),
+        borderColor: alpha(theme.palette.warning.main, 0.4),
+        bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === 'dark' ? 0.12 : 0.08)
+      }}
+    >
+      <Typography variant="caption" color="warning.main" sx={{ textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 700, display: 'block', mb: 0.5 }}>
+        Next session detail
+      </Typography>
+      <Typography variant="h5" fontWeight={700} sx={{ mb: 0.5 }}>
+        {next.title}
+      </Typography>
       {next.objective ? (
-        <div className="text-sm text-slate-700 mb-3">{next.objective}</div>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          {next.objective}
+        </Typography>
       ) : null}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' }, gap: 1.5 }}>
         {['warmup', 'mainSet', 'cooldown'].map((key) => {
           const block = next[key];
           if (!block) return null;
           const labelMap = { warmup: 'Warm-up', mainSet: 'Main set', cooldown: 'Cool-down' };
           return (
-            <div key={key} className="rounded-xl bg-white p-3 border border-orange-200">
-              <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">{labelMap[key]}</div>
-              <div className="text-sm font-semibold mb-1">{block.durationMinutes || 0} min</div>
-              <div className="text-sm text-slate-700 mb-2">{block.description}</div>
-              <div className="flex items-center gap-2 flex-wrap text-xs">
+            <Box
+              key={key}
+              sx={{
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                p: 1.5,
+                border: 1,
+                borderColor: alpha(theme.palette.warning.main, 0.35)
+              }}
+            >
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.5 }}>
+                {labelMap[key]}
+              </Typography>
+              <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+                {block.durationMinutes || 0} min
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {block.description}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                 <PaceBandPill band={block.targetPace} />
                 {block.hrZone ? <Chip size="small" label={block.hrZone} variant="outlined" /> : null}
                 {block.rpe ? <Chip size="small" color="warning" label={`RPE ${block.rpe}`} /> : null}
-              </div>
-            </div>
+              </Stack>
+            </Box>
           );
         })}
-      </div>
-    </div>
-  );
-}
-
-function TimelineDay({ day, dayLabel }) {
-  if (!day) return null;
-  const sessionEmoji = {
-    easy_run: 'EASY',
-    long_run: 'LONG',
-    tempo: 'TEMPO',
-    threshold: 'THRES',
-    intervals: 'INT',
-    rest_or_xt: 'REST',
-    race_pace: 'RACE',
-    fartlek: 'FART'
-  };
-
-  const isRest = day.sessionType === 'rest_or_xt';
-
-  return (
-    <div className={`relative pl-10 pb-5 ${isRest ? 'opacity-80' : ''}`}>
-      <div className="absolute left-0 top-1 w-7 h-7 rounded-full bg-orange-500 text-white text-[10px] font-bold flex items-center justify-center">
-        {dayLabel}
-      </div>
-      <div className="absolute left-3.5 top-8 bottom-0 w-px bg-orange-200" />
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 mb-1">
-          <div>
-            <div className="text-base font-semibold text-slate-900">{day.title}</div>
-            <div className="text-xs text-slate-500 uppercase tracking-wide">{sessionEmoji[day.sessionType] || day.sessionType}</div>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <Chip size="small" variant="outlined" label={`${day.durationMinutes || 0} min`} />
-            {day.distanceKm ? (
-              <Chip size="small" variant="outlined" label={`${fmt(day.distanceKm, ' km', 1)}`} />
-            ) : null}
-            {day.rpe ? <Chip size="small" color="warning" label={`RPE ${day.rpe}`} /> : null}
-          </div>
-        </div>
-        {day.description ? (
-          <div className="text-sm text-slate-700 mb-2">{day.description}</div>
-        ) : null}
-        <PaceBandPill band={day.targetPace} />
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -431,28 +533,41 @@ function FourWeekOutlook({ outlook }) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
       {outlook.map((week) => (
-        <div key={week.week} className="rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">Week {week.week}</div>
-          <div className="text-base font-bold text-slate-900 mb-1">{week.focus}</div>
-          <div className="text-sm text-slate-700">{fmt(week.volumeKm, ' km', 1)} • {week.qualitySessions || 0} quality</div>
-          {week.notes ? <div className="text-xs text-slate-500 mt-2">{week.notes}</div> : null}
-        </div>
+        <Box key={week.week} sx={reportCardSx({ p: 2 })}>
+          <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.5 }}>
+            Week {week.week}
+          </Typography>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 0.5 }}>
+            {week.focus}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            {fmt(week.volumeKm, ' km', 1)} • {week.qualitySessions || 0} quality
+          </Typography>
+          {week.notes ? (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              {week.notes}
+            </Typography>
+          ) : null}
+        </Box>
       ))}
-    </div>
+    </Box>
   );
 }
 
 function ParagraphCard({ children }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 text-sm leading-relaxed text-slate-800">
-      {children}
-    </div>
+    <Box sx={reportCardSx({ p: 2.5 })}>
+      <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
+        {children}
+      </Typography>
+    </Box>
   );
 }
 
 function TrainingReport() {
+  const { profile } = useRunAdvisorProfile();
   const [windowDays, setWindowDays] = useState(84);
   const [report, setReport] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -520,26 +635,37 @@ function TrainingReport() {
   const exec = report?.executiveSummary;
 
   return (
-    <Box className="training-report-page max-w-6xl mx-auto px-4 pb-10">
+    <Box className="training-report-page" sx={{ maxWidth: 1152, mx: 'auto', px: 2, pb: 5 }}>
       <style>{`
         @media print {
           .no-print { display: none !important; }
           .training-report-page { max-width: none !important; padding: 0 !important; }
           .print-break { page-break-before: always; }
+          .training-report-page,
+          .training-report-page * {
+            color: #1f1b16 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .training-report-page .MuiBox-root,
+          .training-report-page .MuiPaper-root {
+            background: #ffffff !important;
+            border-color: #e2e8f0 !important;
+          }
         }
       `}</style>
 
-      <div className="no-print mb-4">
-        <Paper elevation={0} className="p-4 rounded-2xl border border-slate-200 bg-slate-50">
+      <Box className="no-print" sx={{ mb: 2 }}>
+        <Paper elevation={0} sx={reportCardSx({ p: 2, bgcolor: 'background.surfaceVariant' })}>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="stretch">
-            <div className="flex-1">
+            <Box sx={{ flex: 1 }}>
               <Typography variant="h5" fontWeight={800}>
                 Training Report
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Coach-style report with statistical analytics and a day-by-day plan, grounded in your real Strava history.
               </Typography>
-            </div>
+            </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems="center">
               <TextField
                 select
@@ -570,7 +696,7 @@ function TrainingReport() {
             </Stack>
           </Stack>
         </Paper>
-      </div>
+      </Box>
 
       {error ? (
         <Alert severity="error" sx={{ mb: 2 }} className="no-print">
@@ -584,8 +710,8 @@ function TrainingReport() {
       ) : null}
 
       {!report && !loading && !analytics ? (
-        <Paper elevation={0} className="p-8 rounded-2xl border border-slate-200 bg-white text-center">
-          <Typography variant="h6" fontWeight={700} className="mb-2">
+        <Paper elevation={0} sx={reportCardSx({ p: 4, textAlign: 'center' })}>
+          <Typography variant="h6" fontWeight={700} sx={{ mb: 1 }}>
             No report yet
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -595,21 +721,23 @@ function TrainingReport() {
       ) : null}
 
       {report ? (
-        <div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 mb-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <div>
-                <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-1">
+        <Box>
+          <Box sx={reportCardSx({ p: 3, mb: 2 })}>
+            <Stack direction="row" flexWrap="wrap" justifyContent="space-between" alignItems="baseline" spacing={1.5}>
+              <Box>
+                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.6, fontWeight: 600, display: 'block', mb: 0.5 }}>
                   Coach report • {windowDays}-day window
-                </div>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 leading-tight">
+                </Typography>
+                <Typography variant="h4" fontWeight={800} sx={{ lineHeight: 1.2 }}>
                   {exec?.headline || 'Training report'}
-                </h1>
+                </Typography>
                 {exec?.goalRace ? (
-                  <div className="text-sm text-slate-600 mt-1">Goal race: {exec.goalRace}</div>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    Goal race: {exec.goalRace}
+                  </Typography>
                 ) : null}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              </Box>
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                 {exec?.readinessPhase ? (
                   <Chip
                     label={`Phase: ${exec.readinessPhase}`}
@@ -628,15 +756,17 @@ function TrainingReport() {
                     label={source === 'openai' ? 'AI-generated' : source === 'fallback' ? 'Rule-based (no OpenAI key)' : `Source: ${source}`}
                   />
                 ) : null}
-              </div>
-            </div>
+              </Stack>
+            </Stack>
             {exec?.paragraph ? (
-              <p className="text-base text-slate-700 mt-3 leading-relaxed">{exec.paragraph}</p>
+              <Typography variant="body1" color="text.secondary" sx={{ mt: 1.5, lineHeight: 1.7 }}>
+                {exec.paragraph}
+              </Typography>
             ) : null}
-          </div>
+          </Box>
 
           <SectionHeader number="01" title="Workload Analysis" subtitle="Acute load, ACWR, monotony & strain" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 1.5 }}>
             <StatCard
               label="Weekly load (TRIMP)"
               value={fmt(load.weeklyLoad, '', 0)}
@@ -661,25 +791,25 @@ function TrainingReport() {
               value={fmt(load.strain, '', 0)}
               sublabel="Weekly load × monotony"
             />
-          </div>
+          </Box>
           <ParagraphCard>{report.workloadAnalysis?.paragraph || '—'}</ParagraphCard>
           {Array.isArray(report.workloadAnalysis?.flags) && report.workloadAnalysis.flags.length ? (
-            <div className="mt-3 flex flex-wrap gap-2">
+            <Stack direction="row" flexWrap="wrap" spacing={1} useFlexGap sx={{ mt: 1.5 }}>
               {report.workloadAnalysis.flags.map((flag, idx) => (
                 <Chip key={idx} label={flag} color="warning" variant="outlined" />
               ))}
-            </div>
+            </Stack>
           ) : null}
-          <div className="mt-4">
+          <Box sx={{ mt: 2 }}>
             {analytics?.weeklyLoadSeries?.length ? (
               <ChartCard height={260}>
                 <WeeklyLoadChart series={analytics.weeklyLoadSeries} />
               </ChartCard>
             ) : null}
-          </div>
+          </Box>
 
           <SectionHeader number="02" title="Pace & Effort Analysis" subtitle="Intensity distribution and effort pattern" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 1.5 }}>
             <StatCard
               label="Average pace"
               value={paceLabel(analytics?.pace?.avgPaceMinPerKm)}
@@ -692,40 +822,42 @@ function TrainingReport() {
               sublabel={analytics?.dataQuality?.hasHeartRate ? 'Live HR data' : 'No HR data — using pace proxy'}
             />
             <StatCard label="Total elevation" value={`${fmt(volume.totalElevationM, ' m', 0)}`} />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          </Box>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
             <ChartCard height={240}>
               <IntensityDistributionChart pct={intensity} />
             </ChartCard>
             <ChartCard height={240}>
               <PaceTrendChart activities={analytics?.perActivity || []} />
             </ChartCard>
-          </div>
-          <div className="mt-3">
+          </Box>
+          <Box sx={{ mt: 1.5 }}>
             <ParagraphCard>
               {report.paceEffortAnalysis?.paragraph || '—'}
               {report.paceEffortAnalysis?.intensityComment ? (
-                <span className="block mt-2 text-slate-700">
-                  <span className="font-semibold">Coach note: </span>
+                <Typography component="span" variant="body2" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  <Box component="span" fontWeight={600}>Coach note: </Box>
                   {report.paceEffortAnalysis.intensityComment}
-                </span>
+                </Typography>
               ) : null}
             </ParagraphCard>
-          </div>
+          </Box>
 
           <SectionHeader number="03" title="Split Analysis" subtitle="Per-activity pacing, HR drift, and effort" />
           <ParagraphCard>{report.splitAnalysis?.paragraph || '—'}</ParagraphCard>
-          <div className="mt-3">
+          <Box sx={{ mt: 1.5 }}>
             <SplitsTable activities={report.splitAnalysis?.activities || analytics?.perActivity || []} />
-          </div>
+          </Box>
 
           <SectionHeader number="04" title="Risk & Recovery" subtitle="Injury risk and recovery checklist" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-            <div className="md:col-span-2">
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '2fr 1fr' }, gap: 1.5, mb: 1.5 }}>
+            <Box>
               <ParagraphCard>{report.riskAndRecovery?.paragraph || '—'}</ParagraphCard>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="text-xs uppercase tracking-wide text-slate-500 mb-1 font-semibold">Injury risk</div>
+            </Box>
+            <Box sx={reportCardSx({ p: 2.5 })}>
+              <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600, display: 'block', mb: 0.5 }}>
+                Injury risk
+              </Typography>
               <Chip
                 label={(report.riskAndRecovery?.injuryRiskLevel || 'low').toUpperCase()}
                 color={
@@ -738,23 +870,34 @@ function TrainingReport() {
                 sx={{ fontWeight: 700 }}
               />
               {Array.isArray(report.riskAndRecovery?.recoveryActions) ? (
-                <ul className="mt-3 space-y-1 text-sm text-slate-700 list-disc list-inside">
+                <Box component="ul" sx={{ mt: 1.5, pl: 2, m: 0 }}>
                   {report.riskAndRecovery.recoveryActions.map((action, idx) => (
-                    <li key={idx}>{action}</li>
+                    <Typography component="li" variant="body2" color="text.secondary" key={idx} sx={{ mb: 0.5 }}>
+                      {action}
+                    </Typography>
                   ))}
-                </ul>
+                </Box>
               ) : null}
-            </div>
-          </div>
+            </Box>
+          </Box>
 
           <SectionHeader number="05" title="Training Plan Timeline" subtitle="Day-by-day plan for the next 7 days" />
-          <div className="rounded-2xl border border-slate-200 bg-white p-5">
-            <div className="relative">
+          <Box sx={reportCardSx({ p: 2.5 })}>
+            <Box sx={{ position: 'relative' }}>
               {(report.weeklyPlan || []).map((d, idx) => (
-                <TimelineDay key={d.day || idx} day={d} dayLabel={DAY_LABELS[idx % 7]} />
+                <WeeklyPlanDayCard
+                  key={d.day || idx}
+                  day={d}
+                  dayIndex={idx}
+                  dayLabel={DAY_LABELS[idx % 7]}
+                  planStartDate={generatedAt || report.generatedAt}
+                  nextSessionDetail={idx === 0 ? report.nextSessionDetail : null}
+                  stravaConnected={Boolean(profile?.stravaId)}
+                  variant="timeline"
+                />
               ))}
-            </div>
-          </div>
+            </Box>
+          </Box>
 
           <SectionHeader number="06" title="Next Session Detail" subtitle="Warm-up, main set, cool-down" />
           <NextSessionCard next={report.nextSessionDetail} />
@@ -762,12 +905,16 @@ function TrainingReport() {
           <SectionHeader number="07" title="4-Week Outlook" subtitle="Month-long progression strategy" />
           <FourWeekOutlook outlook={report.fourWeekOutlook} />
 
-          <div className="mt-8 text-xs text-slate-500 print:mt-12">
+          <Box sx={{ mt: 4, '@media print': { mt: 6 } }}>
             <Divider sx={{ mb: 2 }} />
-            <div>Report generated {formatDate(generatedAt || report.generatedAt)} • Window: {windowDays} days • Activities analyzed: {analytics?.window?.activityCount || 0}</div>
-            <div className="mt-1">Heart-rate zones, ACWR thresholds, and RPE estimates use industry-standard defaults. When HR is missing, intensity is estimated from pace relative to your recent average.</div>
-          </div>
-        </div>
+            <Typography variant="caption" color="text.secondary" display="block">
+              Report generated {formatDate(generatedAt || report.generatedAt)} • Window: {windowDays} days • Activities analyzed: {analytics?.window?.activityCount || 0}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+              Heart-rate zones, ACWR thresholds, and RPE estimates use industry-standard defaults. When HR is missing, intensity is estimated from pace relative to your recent average.
+            </Typography>
+          </Box>
+        </Box>
       ) : null}
     </Box>
   );

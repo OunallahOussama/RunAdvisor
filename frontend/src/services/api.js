@@ -129,7 +129,8 @@ export const stravaApi = {
   deleteTrainingPlan: (planId) => api.delete(`/strava/training-plans/${planId}`),
   getAthleteStats: () => api.get('/strava/athlete/stats'),
   getActivityStreams: (identifier) => api.get(`/strava/activities/${encodeURIComponent(identifier)}/streams`),
-  getActivitySegments: (identifier) => api.get(`/strava/activities/${encodeURIComponent(identifier)}/segments`)
+  getActivitySegments: (identifier) => api.get(`/strava/activities/${encodeURIComponent(identifier)}/segments`),
+  logWorkout: (payload) => api.post('/strava/log-workout', payload)
 };
 
 // Recommendations endpoints

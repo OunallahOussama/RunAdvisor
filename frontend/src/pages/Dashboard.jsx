@@ -13,6 +13,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { activitiesApi, coachApi } from '../services/api';
 import SmartWeeklyReportCard from '../components/SmartWeeklyReportCard';
+import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
 import { useScreenChrome } from '../context/AppShellContext';
 
@@ -48,6 +49,7 @@ function nextSessionHoursAway(report) {
 }
 
 function Dashboard() {
+  const { profile } = useRunAdvisorProfile();
   const [weeklyReport, setWeeklyReport] = useState(() => loadSnapshot(HOME_WEEKLY_REPORT_KEY)?.data || null);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportRefreshing, setReportRefreshing] = useState(false);
@@ -141,6 +143,7 @@ function Dashboard() {
           error={reportError}
           windowDays={7}
           onRefresh={() => loadWeeklyReport({ force: true })}
+          stravaConnected={Boolean(profile?.stravaId)}
         />
       </Box>
 

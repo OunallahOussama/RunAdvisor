@@ -14,6 +14,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import {
   ActivityIcon,
   BoltIcon,
@@ -25,6 +26,7 @@ import {
   TargetIcon,
   TrendIcon
 } from './icons';
+import { WeeklyPlanGrid } from './WeeklyPlanDayCard';
 
 const WINDOW_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
@@ -33,19 +35,6 @@ const WINDOW_OPTIONS = [
   { value: 56, label: 'Last 8 weeks' },
   { value: 84, label: 'Last 12 weeks' }
 ];
-
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-const SESSION_TYPE_THEME = {
-  easy_run: { color: '#0ea5e9', label: 'Easy' },
-  long_run: { color: '#7c3aed', label: 'Long' },
-  tempo: { color: '#f59e0b', label: 'Tempo' },
-  threshold: { color: '#ef4444', label: 'Threshold' },
-  intervals: { color: '#dc2626', label: 'Intervals' },
-  race_pace: { color: '#be123c', label: 'Race pace' },
-  fartlek: { color: '#ea580c', label: 'Fartlek' },
-  rest_or_xt: { color: '#94a3b8', label: 'Rest / XT' }
-};
 
 const READINESS_CHIP_COLOR = {
   build: 'primary',
@@ -110,8 +99,10 @@ function StatTile({ label, value, sublabel, icon: Icon, accent }) {
     <Card
       variant="outlined"
       sx={{
-        bgcolor: accent ? 'primary.main' : 'action.hover',
-        color: accent ? 'primary.contrastText' : 'inherit',
+        bgcolor: accent
+          ? 'primary.main'
+          : 'action.hover',
+        color: accent ? 'primary.contrastText' : 'text.primary',
         minHeight: 96
       }}
     >
@@ -185,7 +176,9 @@ function NextSessionMini({ next }) {
       sx={{
         borderColor: 'warning.main',
         bgcolor: (theme) =>
-          theme.palette.mode === 'dark' ? 'rgba(245,158,11,0.08)' : 'rgba(254, 243, 199, 0.55)'
+          theme.palette.mode === 'dark'
+            ? alpha(theme.palette.warning.main, 0.12)
+            : alpha(theme.palette.warning.main, 0.14)
       }}
     >
       <CardContent sx={{ py: 1.75, pb: '14px !important' }}>
@@ -216,105 +209,6 @@ function NextSessionMini({ next }) {
         </Stack>
       </CardContent>
     </Card>
-  );
-}
-
-function TimelineStrip({ weeklyPlan = [] }) {
-  const days = weeklyPlan.slice(0, 7);
-  if (days.length === 0) {
-    return null;
-  }
-
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        sx={{
-          textTransform: 'uppercase',
-          letterSpacing: 0.6,
-          fontWeight: 700,
-          color: 'text.secondary',
-          display: 'block',
-          mb: 1
-        }}
-      >
-        Next 7 days plan
-      </Typography>
-      <Box
-        data-testid="weekly-plan-timeline"
-        sx={{
-          display: 'grid',
-          gap: 1,
-          gridTemplateColumns: {
-            xs: 'repeat(2, 1fr)',
-            sm: 'repeat(4, 1fr)',
-            md: 'repeat(7, 1fr)'
-          }
-        }}
-      >
-        {days.map((day, idx) => {
-          const theme = SESSION_TYPE_THEME[day.sessionType] || {
-            color: '#64748b',
-            label: day.sessionType || 'Session'
-          };
-          return (
-            <Tooltip
-              key={day.day ?? idx}
-              arrow
-              placement="top"
-              title={
-                <>
-                  <Box sx={{ fontWeight: 700, mb: 0.25 }}>{day.title}</Box>
-                  {day.description ? <Box sx={{ fontSize: 12 }}>{day.description}</Box> : null}
-                </>
-              }
-            >
-              <Card
-                data-testid="weekly-plan-day"
-                variant="outlined"
-                sx={{
-                  borderLeft: `4px solid ${theme.color}`,
-                  borderRadius: 1.5,
-                  bgcolor: 'background.paper',
-                  height: '100%'
-                }}
-              >
-                <CardContent sx={{ py: 1, px: 1.25, pb: '8px !important' }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
-                    <Typography
-                      variant="caption"
-                      sx={{
-                        fontWeight: 700,
-                        color: 'text.secondary',
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.5
-                      }}
-                    >
-                      {DAY_LABELS[idx % 7]}
-                    </Typography>
-                    <Box
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        bgcolor: theme.color
-                      }}
-                    />
-                  </Stack>
-                  <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.2 }}>
-                    {day.title || theme.label}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
-                    {day.durationMinutes ? `${day.durationMinutes} min` : '—'}
-                    {day.distanceKm ? ` · ${formatNumber(day.distanceKm, { digits: 1, suffix: ' km' })}` : ''}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Tooltip>
-          );
-        })}
-      </Box>
-    </Box>
   );
 }
 
@@ -353,7 +247,8 @@ function SmartWeeklyReportCard({
   windowDays = 7,
   onWindowChange,
   onRefresh,
-  refreshing = false
+  refreshing = false,
+  stravaConnected = false
 }) {
   const analytics = data?.analytics || null;
   const report = data?.report || null;
@@ -603,7 +498,12 @@ function SmartWeeklyReportCard({
 
             <NextSessionMini next={report?.nextSessionDetail} />
 
-            <TimelineStrip weeklyPlan={report?.weeklyPlan} />
+            <WeeklyPlanGrid
+              weeklyPlan={report?.weeklyPlan}
+              planStartDate={data?.generatedAt || report?.generatedAt}
+              nextSessionDetail={report?.nextSessionDetail}
+              stravaConnected={stravaConnected}
+            />
 
             <Stack
               direction="row"

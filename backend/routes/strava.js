@@ -689,6 +689,62 @@ function generatePerformanceVector(activity) {
 }
 
 /**
+ * Log a planned workout as a manual Strava activity (activity:write).
+ * Strava has no native "planned workout" API — this creates a private manual entry.
+ * POST /api/strava/log-workout
+ */
+router.post('/log-workout', auth, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      durationMinutes,
+      distanceKm,
+      sessionType,
+      scheduledDate,
+      targetPace,
+      rpe,
+      hrZone,
+      sessionBlocks
+    } = req.body;
+
+    if (!title || !durationMinutes) {
+      return res.status(400).json({
+        success: false,
+        message: 'title and durationMinutes are required.'
+      });
+    }
+
+    const { accessToken } = await prepareUserForStravaApi(req.userId);
+    const { logPlannedWorkoutToStrava } = require('../services/stravaLogWorkout');
+
+    const result = await logPlannedWorkoutToStrava(accessToken, {
+      title: String(title).trim(),
+      description: typeof description === 'string' ? description.trim() : '',
+      durationMinutes: Number(durationMinutes),
+      distanceKm: distanceKm != null ? Number(distanceKm) : 0,
+      sessionType: sessionType ? String(sessionType) : 'run',
+      scheduledDate,
+      targetPace,
+      rpe,
+      hrZone,
+      sessionBlocks
+    });
+
+    res.json({
+      success: true,
+      stravaActivityId: result.activityId,
+      url: result.url
+    });
+  } catch (error) {
+    const { mapLogWorkoutError } = require('../services/stravaLogWorkout');
+    const mapped = mapLogWorkoutError(error);
+    console.error('Strava log-workout error:', error.response?.data || error.message || error);
+    res.status(mapped.status).json(mapped.body);
+  }
+});
+
+/**
  * Athlete stats from Strava
  * GET /api/strava/athlete/stats
  */
