@@ -365,12 +365,6 @@ function WeeklyPlanDayCard({
               ) : null}
             </Alert>
           ) : null}
-
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.5 }}>
-            Strava has no API for future planned workouts. &quot;Log to Strava&quot; creates a manual activity
-            (private by default) with this session&apos;s details — use it after you complete the run or as a
-            training note. Reconnecting Strava grants activity:write if you connected before that scope was added.
-          </Typography>
         </DialogContent>
 
         <DialogActions sx={{ flexWrap: 'wrap', gap: 1, px: 2, py: 1.5 }}>
