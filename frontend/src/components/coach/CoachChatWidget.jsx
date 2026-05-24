@@ -28,6 +28,7 @@ function CoachChatWidget({ enabled = true }) {
     badgeCount,
     sendMessage,
     retry,
+    replySource,
     suggestedPrompts
   } = useCoachChat({ enabled });
 
@@ -107,6 +108,7 @@ function CoachChatWidget({ enabled = true }) {
               sending={sending}
               error={error}
               suggestedPrompts={suggestedPrompts}
+              replySource={replySource}
               onSend={sendMessage}
               onRetry={retry}
             />

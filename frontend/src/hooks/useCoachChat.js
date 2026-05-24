@@ -11,6 +11,47 @@ function filterCoachNotifications(notifications = []) {
   return notifications.filter((n) => COACH_NOTIFICATION_TYPES.includes(n.type) && !n.readAt);
 }
 
+function mapSendError(err) {
+  if (!err?.response) {
+    return 'Could not reach server. Check your connection and try again.';
+  }
+
+  const { status, data } = err.response;
+
+  if (status === 401) {
+    return 'Please sign in again to continue chatting with your coach.';
+  }
+
+  if (status === 429) {
+    return data?.message || data?.error || 'Too many messages — please try again later.';
+  }
+
+  return data?.message || data?.error || 'Failed to send message';
+}
+
+function buildMessagesFromSendResponse(data, optimistic, trimmed) {
+  const serverMessages = Array.isArray(data?.messages) ? data.messages : [];
+  if (serverMessages.length > 0) {
+    return serverMessages;
+  }
+
+  const reply = String(data?.reply || '').trim();
+  const userMessage = {
+    id: optimistic.id,
+    role: 'user',
+    content: trimmed,
+    createdAt: optimistic.createdAt
+  };
+  const assistantMessage = {
+    id: `assistant-${Date.now()}`,
+    role: 'assistant',
+    content: reply || "Coach couldn't generate a reply. Please try again.",
+    createdAt: new Date().toISOString()
+  };
+
+  return [userMessage, assistantMessage];
+}
+
 export function useCoachChat({ enabled = true } = {}) {
   const [open, setOpen] = useState(false);
   const [context, setContext] = useState(null);
@@ -19,8 +60,10 @@ export function useCoachChat({ enabled = true } = {}) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [replySource, setReplySource] = useState(null);
   const [badgeCount, setBadgeCount] = useState(0);
   const openedRef = useRef(false);
+  const sendingRef = useRef(false);
 
   const fetchBadgeCount = useCallback(async () => {
     if (!enabled) {
@@ -95,7 +138,7 @@ export function useCoachChat({ enabled = true } = {}) {
 
   const sendMessage = useCallback(async (text) => {
     const trimmed = String(text || '').trim();
-    if (!trimmed || sending) {
+    if (!trimmed || sendingRef.current) {
       return;
     }
 
@@ -106,20 +149,27 @@ export function useCoachChat({ enabled = true } = {}) {
       createdAt: new Date().toISOString()
     };
 
+    sendingRef.current = true;
     setMessages((prev) => [...prev, optimistic]);
     setSending(true);
     setError(null);
 
     try {
       const res = await coachChatApi.sendMessage(trimmed);
-      setMessages(res?.data?.messages || []);
+      const nextMessages = buildMessagesFromSendResponse(res?.data, optimistic, trimmed);
+      setReplySource(res?.data?.source || null);
+      setMessages(nextMessages);
     } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Coach chat send failed:', err);
+      }
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setError(err?.response?.data?.message || err?.response?.data?.error || 'Failed to send message');
+      setError(mapSendError(err));
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
-  }, [sending]);
+  }, []);
 
   const retry = useCallback(async () => {
     setError(null);
@@ -164,6 +214,7 @@ export function useCoachChat({ enabled = true } = {}) {
     badgeCount,
     sendMessage,
     retry,
+    replySource,
     suggestedPrompts: context?.suggestedPrompts || []
   };
 }

@@ -13,6 +13,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 
 function MessageBubble({ message }) {
   const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
 
   return (
     <Box
@@ -22,8 +23,16 @@ function MessageBubble({ message }) {
         px: 1.5,
         py: 1,
         borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-        bgcolor: isUser ? 'primary.main' : 'background.surfaceContainerHigh',
-        color: isUser ? 'primary.contrastText' : 'text.primary',
+        bgcolor: isUser
+          ? 'primary.main'
+          : isSystem
+            ? 'warning.main'
+            : 'background.surfaceContainerHigh',
+        color: isUser
+          ? 'primary.contrastText'
+          : isSystem
+            ? 'warning.contrastText'
+            : 'text.primary',
         boxShadow: 1
       }}
       data-testid={`coach-message-${message.role}`}
@@ -53,6 +62,7 @@ function CoachChatPanel({
   sending,
   error,
   suggestedPrompts,
+  replySource,
   onSend,
   onRetry
 }) {
@@ -185,9 +195,33 @@ function CoachChatPanel({
           <MessageBubble key={message.id || `${message.role}-${message.createdAt}`} message={message} />
         ))}
 
+        {replySource === 'rules' && messages.some((m) => m.role === 'assistant') ? (
+          <Chip
+            label="Training data analysis"
+            size="small"
+            variant="outlined"
+            sx={{ alignSelf: 'flex-start', ml: 0.5, fontSize: '0.7rem', height: 22 }}
+            data-testid="coach-reply-source-chip"
+          />
+        ) : null}
+
+        {replySource === 'openai' && messages.some((m) => m.role === 'assistant') ? (
+          <Chip
+            label="AI coach"
+            size="small"
+            variant="outlined"
+            color="primary"
+            sx={{ alignSelf: 'flex-start', ml: 0.5, fontSize: '0.7rem', height: 22 }}
+            data-testid="coach-reply-source-openai"
+          />
+        ) : null}
+
         {sending ? (
-          <Box sx={{ alignSelf: 'flex-start', px: 1 }}>
+          <Box sx={{ alignSelf: 'flex-start', px: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={20} aria-label="Coach is typing" />
+            <Typography variant="caption" color="text.secondary">
+              Coach is typing…
+            </Typography>
           </Box>
         ) : null}
         <div ref={scrollRef} />

@@ -57,8 +57,8 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/activities', require('./routes/activities'));
 app.use('/api/recommendations', require('./routes/recommendations'));
 app.use('/api/vector-search', require('./routes/vectorSearch'));
-app.use('/api/coach', require('./routes/coach'));
 app.use('/api/coach/chat', require('./routes/coachChat'));
+app.use('/api/coach', require('./routes/coach'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/strava', stravaLimiter, require('./routes/strava'));
 
