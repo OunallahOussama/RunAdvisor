@@ -25,13 +25,15 @@ import {
   InstallIcon,
   RunAdvisorMark,
   SyncIcon,
-  TargetIcon
+  TargetIcon,
+  TrendIcon
 } from './icons';
 
 const navigationItems = [
   { icon: DashboardIcon, label: 'Dashboard', to: '/dashboard' },
   { icon: ActivityIcon, label: 'Activities', to: '/activities' },
   { icon: CoachIcon, label: 'Training', to: '/recommendations' },
+  { icon: TrendIcon, label: 'Report', to: '/training-report' },
   { icon: TargetIcon, label: 'Profile', to: '/profile' },
   { icon: SyncIcon, label: 'Strava', to: '/strava-connect' }
 ];

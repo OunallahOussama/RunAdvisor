@@ -1,6 +1,20 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const CONSENT_VERSION = '2026-05-24';
+
+const consentSchema = new mongoose.Schema({
+  shareAnonymizedTraining: { type: Boolean, default: false },
+  marketingEmails: { type: Boolean, default: false },
+  notifications: {
+    browser: { type: Boolean, default: false },
+    recommendations: { type: Boolean, default: true },
+    weeklyReport: { type: Boolean, default: true }
+  },
+  consentVersion: { type: String, default: null },
+  consentAcceptedAt: { type: Date, default: null }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
@@ -78,7 +92,16 @@ const userSchema = new mongoose.Schema({
 
   // Vector embeddings for preferences
   preferenceVector: [Number],
-  
+
+  // Onboarding + consent
+  onboardingCompletedAt: { type: Date, default: null },
+  runningGoal: {
+    type: String,
+    enum: ['5k', '10k', 'half', 'marathon', 'general_fitness', null],
+    default: null
+  },
+  consent: { type: consentSchema, default: () => ({}) },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -105,4 +128,8 @@ userSchema.methods.comparePassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-module.exports = mongoose.model('User', userSchema);
+const UserModel = mongoose.model('User', userSchema);
+UserModel.CONSENT_VERSION = CONSENT_VERSION;
+
+module.exports = UserModel;
+module.exports.CONSENT_VERSION = CONSENT_VERSION;

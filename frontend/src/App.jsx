@@ -1,12 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Paper from '@mui/material/Paper';
-import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -14,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import Activities from './pages/Activities';
 import ActivityDetail from './pages/ActivityDetail';
 import Recommendations from './pages/Recommendations';
+import TrainingReport from './pages/TrainingReport';
 import StravaConnect from './pages/StravaConnect';
 import StravaCallback from './pages/StravaCallback';
 import TrainingProfile from './pages/TrainingProfile';
@@ -21,14 +21,22 @@ import AdminDashboard from './pages/AdminDashboard';
 import About from './pages/legal/About';
 import Cookies from './pages/legal/Cookies';
 import Privacy from './pages/legal/Privacy';
-import Navbar from './components/Navbar';
 import AppFooter from './components/AppFooter';
 import CookieConsentBanner from './components/CookieConsentBanner';
 import { OfflineIcon } from './components/icons';
 import { useCookieConsent } from './hooks/useCookieConsent';
-import { authApi, setAccessTokenGetter, setAccessTokenRefresher, setApiNotifier } from './services/api';
+import {
+  authApi,
+  setAccessTokenGetter,
+  setAccessTokenRefresher,
+  setApiNotifier,
+  usersApi
+} from './services/api';
 import { ApiNotificationProvider, useApiNotification } from './context/ApiNotificationContext';
 import { RunAdvisorProfileProvider } from './context/RunAdvisorProfileContext';
+import { AppShellProvider, useAppShell } from './context/AppShellContext';
+import AppShell from './components/shell/AppShell';
+import OnboardingStepper from './components/onboarding/OnboardingStepper';
 import { usePwaInstallPrompt } from './hooks/usePwaInstallPrompt';
 import TrainingSyncManager from './components/TrainingSyncManager';
 import AuthInAppBrowserNotice from './components/AuthInAppBrowserNotice';
@@ -57,6 +65,113 @@ function LoadingScreen({ message }) {
   );
 }
 
+function AuthenticatedRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/recommendations" element={<Recommendations />} />
+      <Route path="/dashboard" element={<Navigate to="/" replace />} />
+      <Route path="/activities/:id" element={<ActivityDetail />} />
+      <Route path="/activities" element={<Activities />} />
+      <Route path="/training-report" element={<TrainingReport />} />
+      <Route path="/strava-connect" element={<StravaConnect />} />
+      <Route path="/profile" element={<TrainingProfile />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/cookies" element={<Cookies />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function UnauthenticatedRoutes() {
+  return (
+    <Routes>
+      <Route path="/about" element={<About />} />
+      <Route path="/cookies" element={<Cookies />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/callback" element={<StravaCallback />} />
+      <Route path="*" element={<Navigate to="/login" />} />
+    </Routes>
+  );
+}
+
+function AuthenticatedShell({ user, onLogout }) {
+  const [consent, setConsent] = useState(null);
+  const [onboardingNeeded, setOnboardingNeeded] = useState(false);
+  const { openOnboarding, closeOnboarding, onboardingOpen } = useAppShell();
+  const location = useLocation();
+
+  const refreshSelf = useCallback(async () => {
+    try {
+      const res = await usersApi.getMe();
+      const profile = res?.data?.profile || null;
+      setConsent(res?.data?.consent || null);
+      setOnboardingNeeded(!profile?.onboardingCompletedAt);
+    } catch {
+      /* ignore — user can still use the app */
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSelf();
+  }, [refreshSelf]);
+
+  useEffect(() => {
+    if (onboardingNeeded) {
+      openOnboarding();
+    } else {
+      closeOnboarding();
+    }
+  }, [onboardingNeeded, openOnboarding, closeOnboarding]);
+
+  // Replay-tour: clear onboarding then re-open
+  const handleReplayTour = useCallback(async () => {
+    try {
+      await usersApi.completeOnboarding({ reset: true });
+    } catch {
+      /* ignore — still try to open */
+    }
+    setOnboardingNeeded(true);
+    openOnboarding();
+  }, [openOnboarding]);
+
+  const handleOnboardingComplete = async () => {
+    closeOnboarding();
+    setOnboardingNeeded(false);
+    await refreshSelf();
+  };
+
+  const handleOnboardingSkip = async () => {
+    closeOnboarding();
+    setOnboardingNeeded(false);
+  };
+
+  // Don't render the legacy unauthenticated app frame inside the shell
+  // for /login etc; AuthenticatedShell only mounts for logged-in routes.
+  // The /callback Strava OAuth handler still works because StravaCallback
+  // is rendered inside the shell when authenticated.
+  return (
+    <>
+      <AppShell user={user} consent={consent} onLogout={onLogout} onReplayTour={handleReplayTour}>
+        <Routes location={location}>
+          <Route path="/callback" element={<StravaCallback />} />
+          <Route path="/*" element={<AuthenticatedRoutes />} />
+        </Routes>
+      </AppShell>
+      <OnboardingStepper
+        open={onboardingOpen}
+        user={user}
+        onComplete={handleOnboardingComplete}
+        onSkip={handleOnboardingSkip}
+      />
+    </>
+  );
+}
+
 function AppContent() {
   const {
     error,
@@ -71,10 +186,11 @@ function AppContent() {
   const [profileError, setProfileError] = useState('');
   const [profileSyncing, setProfileSyncing] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [isOnline, setIsOnline] = useState(window.navigator.onLine);
+  const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? window.navigator.onLine : true);
   const syncedAuth0UserRef = useRef('');
-  const { canInstall, promptToInstall } = usePwaInstallPrompt();
+  usePwaInstallPrompt();
   const { bannerOpen, acceptCookies } = useCookieConsent();
+
   useEffect(() => {
     setApiNotifier(showNotification);
 
@@ -215,65 +331,37 @@ function AppContent() {
       <Router>
         <Box className="App" sx={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
           <TrainingSyncManager enabled={isAuthenticated} />
-          {isAuthenticated && (
-            <Navbar
-              canInstall={canInstall}
-              onInstall={promptToInstall}
-              onLogout={handleLogout}
-              user={user}
-            />
+          {!isOnline ? (
+            <Box sx={{ px: 2, pt: 1 }}>
+              <Alert icon={<OfflineIcon size={20} />} severity="warning" sx={{ mb: 1 }}>
+                Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when
+                available.
+              </Alert>
+            </Box>
+          ) : null}
+          {profileError ? (
+            <Box sx={{ px: 2, pt: 1 }}>
+              <Alert severity="error" sx={{ mb: 1 }}>{profileError}</Alert>
+            </Box>
+          ) : null}
+          {authError && !isGoogleDisallowedUserAgentError(authError) ? (
+            <Box sx={{ px: 2, pt: 1 }}>
+              <Alert severity="warning" sx={{ mb: 1 }}>Sign-in error: {authError}</Alert>
+            </Box>
+          ) : null}
+          {(isGoogleDisallowedUserAgentError(authError) || authBrowserRestricted) && !isAuthenticated ? (
+            <Container maxWidth="sm" sx={{ px: 2, pt: 1 }}>
+              <AuthInAppBrowserNotice loginPath="/login" />
+            </Container>
+          ) : null}
+
+          {isAuthenticated ? (
+            <AuthenticatedShell user={user} onLogout={handleLogout} />
+          ) : (
+            <Container maxWidth="lg" sx={{ pt: 2, pb: 4, flex: 1 }}>
+              <UnauthenticatedRoutes />
+            </Container>
           )}
-          <Container maxWidth="lg" sx={{ pt: isAuthenticated ? 2 : 0, pb: 4, flex: 1 }}>
-            <Stack spacing={2} sx={{ mb: 2 }}>
-              {!isOnline && (
-                <Alert icon={<OfflineIcon size={20} />} severity="warning">
-                  Offline mode is active. RunAdvisor will use saved pages and your most recent cached training data when
-                  available.
-                </Alert>
-              )}
-              {profileError && <Alert severity="error">{profileError}</Alert>}
-              {authError && !isGoogleDisallowedUserAgentError(authError) && (
-                <Alert severity="warning">Sign-in error: {authError}</Alert>
-              )}
-              {(isGoogleDisallowedUserAgentError(authError) || authBrowserRestricted) && !isAuthenticated && (
-                <AuthInAppBrowserNotice loginPath="/login" />
-              )}
-            </Stack>
-            <Routes>
-              <Route path="/about" element={<About />} />
-              <Route path="/cookies" element={<Cookies />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route
-                path="/login"
-                element={
-                  isAuthenticated ? (
-                    <Navigate to="/dashboard" />
-                  ) : (
-                    <Login />
-                  )
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  isAuthenticated ? (
-                    <Navigate to="/dashboard" />
-                  ) : (
-                    <Register />
-                  )
-                }
-              />
-              <Route path="/dashboard" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
-              <Route path="/activities/:id" element={isAuthenticated ? <ActivityDetail /> : <Navigate to="/login" />} />
-              <Route path="/activities" element={isAuthenticated ? <Activities /> : <Navigate to="/login" />} />
-              <Route path="/recommendations" element={isAuthenticated ? <Recommendations /> : <Navigate to="/login" />} />
-              <Route path="/strava-connect" element={isAuthenticated ? <StravaConnect /> : <Navigate to="/login" />} />
-              <Route path="/profile" element={isAuthenticated ? <TrainingProfile /> : <Navigate to="/login" />} />
-              <Route path="/admin" element={isAuthenticated ? <AdminDashboard /> : <Navigate to="/login" />} />
-              <Route path="/callback" element={<StravaCallback />} />
-              <Route path="/" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} />} />
-            </Routes>
-          </Container>
           <AppFooter />
           <CookieConsentBanner onAccept={acceptCookies} open={bannerOpen} />
         </Box>
@@ -285,7 +373,9 @@ function AppContent() {
 function App() {
   return (
     <ApiNotificationProvider>
-      <AppContent />
+      <AppShellProvider>
+        <AppContent />
+      </AppShellProvider>
     </ApiNotificationProvider>
   );
 }

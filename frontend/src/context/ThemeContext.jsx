@@ -1,72 +1,118 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider as MuiThemeProvider } from '@mui/material/styles';
-import { createAppTheme } from '../theme/muiAppTheme';
+import { getTheme, resolveColorMode } from '../theme';
 
-const THEME_STORAGE_KEY = 'runadvisor-theme';
+/**
+ * Single source of truth for theme preferences. Persists a user
+ * preference of 'system' | 'light' | 'dark' under
+ * `runadvisor.theme.mode` and resolves it against the current
+ * `prefers-color-scheme` for `system`.
+ */
+const THEME_PREFERENCE_KEY = 'runadvisor.theme.mode';
+const LEGACY_THEME_KEY = 'runadvisor-theme';
+
 const ThemeContext = createContext(null);
 
-function getStoredTheme() {
+const VALID_PREFERENCES = new Set(['system', 'light', 'dark']);
+
+function getStoredPreference() {
   if (typeof window === 'undefined') {
-    return 'light';
+    return 'system';
   }
 
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  try {
+    const stored = window.localStorage.getItem(THEME_PREFERENCE_KEY);
+    if (VALID_PREFERENCES.has(stored)) {
+      return stored;
+    }
 
-  if (storedTheme === 'light' || storedTheme === 'dark') {
-    return storedTheme;
+    // Migrate legacy hard-light/dark preference from earlier builds.
+    const legacy = window.localStorage.getItem(LEGACY_THEME_KEY);
+    if (legacy === 'light' || legacy === 'dark') {
+      window.localStorage.setItem(THEME_PREFERENCE_KEY, legacy);
+      return legacy;
+    }
+  } catch {
+    // ignore — fall through to system
   }
 
-  return 'light';
+  return 'system';
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(getStoredTheme);
+  const [preference, setPreference] = useState(getStoredPreference);
+  const [resolvedMode, setResolvedMode] = useState(() => resolveColorMode(preference));
 
   useEffect(() => {
-    const rootElement = document.documentElement;
-    const themeColor = theme === 'light' ? '#fff7ed' : '#08111f';
-    const themeMetaTag = document.querySelector('meta[name="theme-color"]');
-
-    rootElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
-
-    if (themeMetaTag) {
-      themeMetaTag.setAttribute('content', themeColor);
+    if (typeof window === 'undefined') {
+      return undefined;
     }
-  }, [theme]);
+
+    try {
+      window.localStorage.setItem(THEME_PREFERENCE_KEY, preference);
+    } catch {
+      /* ignore */
+    }
+
+    const next = resolveColorMode(preference);
+    setResolvedMode(next);
+
+    const root = document.documentElement;
+    root.dataset.theme = next;
+    root.dataset.themePreference = preference;
+
+    const themeMetaTag = document.querySelector('meta[name="theme-color"]');
+    if (themeMetaTag) {
+      themeMetaTag.setAttribute('content', next === 'dark' ? '#1a120c' : '#fef7f1');
+    }
+  }, [preference]);
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)');
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return undefined;
+    }
 
-    const handlePreferenceChange = (event) => {
-      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
 
-      if (storedTheme) {
-        return;
+    const handle = () => {
+      if (preference === 'system') {
+        setResolvedMode(media.matches ? 'dark' : 'light');
       }
-
-      setTheme(event.matches ? 'light' : 'dark');
     };
 
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handlePreferenceChange);
-
-      return () => mediaQuery.removeEventListener('change', handlePreferenceChange);
+    if (media.addEventListener) {
+      media.addEventListener('change', handle);
+      return () => media.removeEventListener('change', handle);
     }
 
-    mediaQuery.addListener(handlePreferenceChange);
+    media.addListener(handle);
+    return () => media.removeListener(handle);
+  }, [preference]);
 
-    return () => mediaQuery.removeListener(handlePreferenceChange);
+  const setMode = useCallback((next) => {
+    if (VALID_PREFERENCES.has(next)) {
+      setPreference(next);
+    }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setPreference((current) => {
+      const currentResolved = current === 'system' ? resolveColorMode(current) : current;
+      return currentResolved === 'dark' ? 'light' : 'dark';
+    });
   }, []);
 
   const value = useMemo(() => ({
-    isDarkTheme: theme === 'dark',
-    theme,
-    toggleTheme: () => setTheme((currentTheme) => (currentTheme === 'dark' ? 'light' : 'dark'))
-  }), [theme]);
+    mode: preference,
+    resolvedMode,
+    isDarkTheme: resolvedMode === 'dark',
+    setMode,
+    toggleTheme,
+    theme: resolvedMode
+  }), [preference, resolvedMode, setMode, toggleTheme]);
 
-  const muiTheme = useMemo(() => createAppTheme(theme), [theme]);
+  const muiTheme = useMemo(() => getTheme(resolvedMode), [resolvedMode]);
 
   return (
     <ThemeContext.Provider value={value}>
@@ -87,3 +133,6 @@ export function useTheme() {
 
   return context;
 }
+
+export const useColorMode = useTheme;
+export { THEME_PREFERENCE_KEY };

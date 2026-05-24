@@ -17,11 +17,14 @@ import {
   requestNotificationPermission
 } from '../utils/notifications';
 import { TargetIcon } from '../components/icons';
+import PrivacyConsentPanel from '../components/PrivacyConsentPanel';
+import { useAppShell } from '../context/AppShellContext';
 
 const GOAL_OPTIONS = ['endurance', 'speed', 'recovery', 'race', 'consistency'];
 
 function TrainingProfile() {
   const { profile, refreshProfile } = useRunAdvisorProfile();
+  const { openOnboarding } = useAppShell();
   const [form, setForm] = useState({
     age: '',
     experience: 'intermediate',
@@ -244,6 +247,10 @@ function TrainingProfile() {
           </Stack>
         </CardContent>
       </Card>
+
+      <Box sx={{ mt: 3 }}>
+        <PrivacyConsentPanel onReplayTour={openOnboarding} />
+      </Box>
     </Box>
   );
 }

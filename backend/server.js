@@ -52,6 +52,8 @@ app.use('/api/strava', require('./routes/stravaWebhooks'));
 
 // Routes
 app.use('/api/auth', authLimiter, require('./routes/auth'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/activities', require('./routes/activities'));
 app.use('/api/recommendations', require('./routes/recommendations'));
 app.use('/api/vector-search', require('./routes/vectorSearch'));

@@ -1,449 +1,241 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { activitiesApi, recommendationsApi } from '../services/api';
-import StatsCard from '../components/StatsCard';
-import TrainingProgressCard from '../components/TrainingProgressCard';
-import { requestNotificationPermission } from '../utils/notifications';
-import {
-  ActivityIcon,
-  ClockIcon,
-  CoachIcon,
-  DistanceIcon,
-  ElevationIcon,
-  HeartIcon,
-  PaceIcon,
-  SyncIcon,
-  TargetIcon,
-  TrendIcon
-} from '../components/icons';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import { activitiesApi, coachApi } from '../services/api';
+import SmartWeeklyReportCard from '../components/SmartWeeklyReportCard';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
+import { useScreenChrome } from '../context/AppShellContext';
 
-const DASHBOARD_CACHE_KEY = 'dashboard-summary';
+const HOME_WEEKLY_REPORT_KEY = 'home-weekly-report';
+const HOME_RECENT_ACTIVITIES_KEY = 'home-recent-activities';
+
+function paceLabel(value) {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) {
+    return '—';
+  }
+  const mins = Math.floor(v);
+  const secs = Math.round((v - mins) * 60);
+  return `${mins}:${String(secs).padStart(2, '0')} /km`;
+}
+
+function acwrStatus(acwr) {
+  const v = Number(acwr) || 0;
+  if (v === 0) return { label: 'ACWR n/a', color: 'default' };
+  if (v > 1.5) return { label: 'ACWR overload', color: 'error' };
+  if (v > 1.3) return { label: 'ACWR watch', color: 'warning' };
+  if (v < 0.8) return { label: 'ACWR low', color: 'warning' };
+  return { label: 'ACWR healthy', color: 'success' };
+}
+
+function nextSessionHoursAway(report) {
+  // Best-effort: the structured report's weeklyPlan is day-based, not
+  // a date. We approximate the next non-rest day as "today + N days".
+  const plan = Array.isArray(report?.weeklyPlan) ? report.weeklyPlan : [];
+  const idx = plan.findIndex((day) => day.sessionType !== 'rest_or_xt');
+  if (idx === -1) return null;
+  return idx * 24;
+}
 
 function Dashboard() {
-  const [summary, setSummary] = useState(null);
-  const [trainingProgress, setTrainingProgress] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [statusMessage, setStatusMessage] = useState('');
+  const [weeklyReport, setWeeklyReport] = useState(() => loadSnapshot(HOME_WEEKLY_REPORT_KEY)?.data || null);
+  const [reportLoading, setReportLoading] = useState(true);
+  const [reportRefreshing, setReportRefreshing] = useState(false);
+  const [reportError, setReportError] = useState('');
+  const [recentActivities, setRecentActivities] = useState(() => loadSnapshot(HOME_RECENT_ACTIVITIES_KEY)?.data || []);
+  const [recentLoading, setRecentLoading] = useState(true);
 
-  useEffect(() => {
-    fetchWeeklySummary();
-  }, []);
-
-  const fetchWeeklySummary = async () => {
+  const loadWeeklyReport = useMemo(() => async ({ force = false } = {}) => {
+    if (force) setReportRefreshing(true); else setReportLoading(true);
+    setReportError('');
     try {
-      setLoading(true);
-      const [summaryResponse, reviewResponse] = await Promise.allSettled([
-        activitiesApi.getWeeklySummary(),
-        recommendationsApi.getCoachReview({ days: 28 })
-      ]);
-
-      if (summaryResponse.status === 'fulfilled') {
-        setSummary(summaryResponse.value.data.summary);
-        saveSnapshot(DASHBOARD_CACHE_KEY, summaryResponse.value.data.summary);
-      }
-
-      if (reviewResponse.status === 'fulfilled') {
-        setTrainingProgress(reviewResponse.value.data.trainingProgress || null);
-      }
-
-      setStatusMessage('');
-    } catch (error) {
-      console.error('Error fetching summary:', error);
-      const cachedSummary = loadSnapshot(DASHBOARD_CACHE_KEY);
-
-      if (cachedSummary?.data) {
-        setSummary(cachedSummary.data);
-        setStatusMessage(`Showing your last saved weekly snapshot from ${formatSnapshotTimestamp(cachedSummary.savedAt)}.`);
+      const response = await coachApi.weeklySummary({ windowDays: 7, force });
+      const payload = response?.data || null;
+      setWeeklyReport(payload);
+      if (payload) saveSnapshot(HOME_WEEKLY_REPORT_KEY, payload);
+    } catch (err) {
+      const cached = loadSnapshot(HOME_WEEKLY_REPORT_KEY);
+      if (cached?.data) {
+        setWeeklyReport(cached.data);
+        setReportError(`Showing your saved report from ${formatSnapshotTimestamp(cached.savedAt)}.`);
       } else {
-        setStatusMessage('Unable to load your dashboard right now. Sync or log a run once you are back online.');
+        setReportError(err?.response?.data?.message || err.message || 'Failed to generate your weekly report.');
       }
     } finally {
-      setLoading(false);
+      setReportLoading(false);
+      setReportRefreshing(false);
     }
-  };
+  }, []);
 
-  const quickActions = [
-    {
-      description: 'Connect Strava, refresh recent workouts, and keep your mobile activity history current.',
-      icon: SyncIcon,
-      title: 'Sync recent runs',
-      to: '/strava-connect'
-    },
-    {
-      description: 'Log a session with distance, duration, heart rate, and notes built for touch entry.',
-      icon: ActivityIcon,
-      title: 'Add a manual activity',
-      to: '/activities'
-    },
-    {
-      description: 'Review readiness, risk, and next focus with richer training context.',
-      icon: CoachIcon,
-      title: 'Open training review',
-      to: '/recommendations'
-    },
-    {
-      description: 'Set goal pace, weekly load, and race targets for personalized insights.',
-      icon: TargetIcon,
-      title: 'Training profile',
-      to: '/profile'
+  useScreenChrome({
+    title: 'Today',
+    primaryAction: {
+      label: 'Generate new report',
+      icon: <AutoAwesomeIcon />,
+      onClick: () => loadWeeklyReport({ force: true })
     }
-  ];
+  });
 
-  const statCards = summary
-    ? [
-        {
-          hint: 'Total distance recorded this week.',
-          icon: DistanceIcon,
-          title: 'Total Distance',
-          value: `${summary.totalDistance.toFixed(1)} km`
-        },
-        {
-          hint: 'Time spent moving across all sessions.',
-          icon: ClockIcon,
-          title: 'Total Time',
-          value: `${(summary.totalDuration / 60).toFixed(1)} hrs`
-        },
-        {
-          hint: 'How many sessions fueled your week.',
-          icon: ActivityIcon,
-          title: 'Activities',
-          value: summary.activityCount
-        },
-        {
-          hint: 'Average rhythm across your logged runs.',
-          icon: PaceIcon,
-          title: 'Avg Pace',
-          value: `${summary.avgPace.toFixed(1)} min/km`
-        },
-        {
-          hint: 'Climbing load across the week.',
-          icon: ElevationIcon,
-          title: 'Elevation Gain',
-          value: `${summary.totalElevation.toFixed(0)} m`
-        },
-        {
-          hint: 'Heart rate trend for aerobic control.',
-          icon: HeartIcon,
-          title: 'Avg HR',
-          value: `${summary.avgHeartRate.toFixed(0)} bpm`
-        }
-      ]
-    : [];
+  useEffect(() => {
+    loadWeeklyReport();
+  }, [loadWeeklyReport]);
 
-  const totalHours = summary ? (summary.totalDuration / 60).toFixed(1) : null;
-  const dataStatusLabel = summary ? 'Weekly data loaded' : 'Awaiting first sync';
-  const weeklyFocusTitle = summary ? `${summary.activityCount} sessions logged` : 'Build this week’s baseline';
-  const weeklyFocusDescription = summary
-    ? `You have ${summary.totalDistance.toFixed(1)} km across ${totalHours} hours this week. Review coach guidance to turn that load into pacing, recovery, and race-day decisions.`
-    : 'Sync Strava or add a manual activity to unlock weekly load, pacing, and recovery guidance across the app.';
-  const overviewMetrics = [
-    {
-      label: 'This week',
-      supporting: summary ? `${summary.activityCount} sessions logged` : 'Sync Strava or add a run',
-      value: summary ? `${summary.totalDistance.toFixed(1)} km` : 'No data yet'
-    },
-    {
-      label: 'Training time',
-      supporting: summary ? `${summary.totalElevation.toFixed(0)} m elevation gain` : 'Duration and elevation appear here',
-      value: summary ? `${totalHours} hrs` : 'Ready to track'
-    },
-    {
-      label: 'Training review',
-      supporting: summary ? 'Readiness, pacing, and recovery insights' : 'Unlock guidance after your first sync',
-      value: summary ? 'Available now' : 'Pending data'
-    }
-  ];
+  useEffect(() => {
+    let cancelled = false;
+    setRecentLoading(true);
+    activitiesApi
+      .getActivities(3, 0)
+      .then((res) => {
+        if (cancelled) return;
+        const list = res?.data?.activities || [];
+        setRecentActivities(list);
+        if (list.length > 0) saveSnapshot(HOME_RECENT_ACTIVITIES_KEY, list);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const cached = loadSnapshot(HOME_RECENT_ACTIVITIES_KEY);
+        if (cached?.data) setRecentActivities(cached.data);
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const analytics = weeklyReport?.analytics || null;
+  const report = weeklyReport?.report || null;
+  const sessionCount = analytics?.window?.activityCount ?? null;
+  const acwr = analytics?.trainingLoad?.acwr ?? 0;
+  const status = acwrStatus(acwr);
+  const nextHrs = nextSessionHoursAway(report);
 
   return (
-    <Box component="main">
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={3}
-            justifyContent="space-between"
-            alignItems={{ md: 'flex-start' }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
-                <Chip label="Dashboard" size="small" variant="outlined" />
-                <Chip
-                  color={summary ? 'success' : 'default'}
-                  icon={<SyncIcon size={14} />}
-                  label={dataStatusLabel}
-                  size="small"
-                />
-              </Stack>
-              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-                Weekly training overview
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 560 }}>
-                Monitor weekly load, keep your training data current, and move quickly between logging, syncing, and your
-                training review.
-              </Typography>
-            </Box>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-              <Button
-                component={RouterLink}
-                startIcon={<CoachIcon size={18} />}
-                to="/recommendations"
-                variant="contained"
-              >
-                Open training review
-              </Button>
-              <Button component={RouterLink} startIcon={<ActivityIcon size={18} />} to="/activities" variant="outlined">
-                Log activity
-              </Button>
-            </Stack>
-          </Stack>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 3 }}>
-            {overviewMetrics.map((metric) => (
-              <Card key={metric.label} variant="outlined" sx={{ flex: 1, bgcolor: 'action.hover' }}>
-                <CardContent>
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                    {metric.label}
-                  </Typography>
-                  <Typography variant="h6" fontWeight={700} sx={{ mt: 0.5 }}>
-                    {metric.value}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {metric.supporting}
-                  </Typography>
-                </CardContent>
-              </Card>
-            ))}
-          </Stack>
-        </CardContent>
-      </Card>
-
-      <Box sx={{ mb: 3 }}>
-        <TrainingProgressCard
-          compact
-          progress={trainingProgress}
-          onEnableNotifications={requestNotificationPermission}
-        />
-      </Box>
-
-      <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} sx={{ mb: 3 }} alignItems="stretch">
-        <Card variant="outlined" sx={{ flex: 1 }}>
-          <CardContent>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
-              <Chip color="primary" icon={<TargetIcon size={14} />} label="Weekly focus" size="small" />
-              <Chip
-                color={summary ? 'success' : 'default'}
-                icon={<SyncIcon size={14} />}
-                label={summary ? 'Current week loaded' : 'Ready for first sync'}
-                size="small"
-              />
-            </Stack>
-            <Typography variant="h5" fontWeight={700} gutterBottom>
-              {weeklyFocusTitle}
-            </Typography>
-            <Typography variant="body1" color="text.secondary" paragraph>
-              {weeklyFocusDescription}
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Chip icon={<DistanceIcon size={14} />} label={summary ? `${summary.totalDistance.toFixed(1)} km this week` : 'Weekly load tracking'} variant="outlined" />
-              <Chip icon={<ClockIcon size={14} />} label={summary ? `${totalHours} hours logged` : 'Training time overview'} variant="outlined" />
-              <Chip icon={<TrendIcon size={14} />} label="Personalized insights" variant="outlined" />
-            </Stack>
-          </CardContent>
-        </Card>
-        <Stack spacing={2} sx={{ width: { lg: 360 } }}>
-          <SupportLinkCard
-            description="Readiness, risk, and next workout guidance in one focused workflow."
-            icon={CoachIcon}
-            title={summary ? 'Review this training week' : 'Open when your data is ready'}
-            to="/recommendations"
-            subtitle="Training review"
-          />
-          <SupportLinkCard
-            description="Refresh Strava and keep your mobile activity history accurate."
-            icon={SyncIcon}
-            title="Keep workouts current"
-            to="/strava-connect"
-            subtitle="Data sync"
-          />
-          <SupportLinkCard
-            description="Capture distance, duration, heart rate, and notes without leaving the dashboard flow."
-            icon={ActivityIcon}
-            title="Add a session fast"
-            to="/activities"
-            subtitle="Run log"
-          />
-        </Stack>
+    <Box component="section" aria-labelledby="home-heading">
+      <Stack spacing={1} sx={{ mb: 2 }}>
+        <Typography variant="overline" color="primary" sx={{ letterSpacing: 1 }}>
+          Your week
+        </Typography>
+        <Typography variant="h4" component="h1" id="home-heading">
+          Weekly training overview
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 560 }}>
+          A single coach-style insight for this week. Tap a recommendation to dig deeper.
+        </Typography>
       </Stack>
 
       <Box sx={{ mb: 2 }}>
-        <Typography variant="overline" color="primary" fontWeight={700}>
-          Weekly metrics
-        </Typography>
-        <Typography variant="h5" fontWeight={700}>
-          Current training snapshot
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 480, mt: 0.5 }}>
-          Volume, pace, elevation, and heart-rate trends for the current week.
-        </Typography>
+        <SmartWeeklyReportCard
+          data={weeklyReport}
+          loading={reportLoading}
+          refreshing={reportRefreshing}
+          error={reportError}
+          windowDays={7}
+          onRefresh={() => loadWeeklyReport({ force: true })}
+        />
       </Box>
 
-      {statusMessage && (
-        <Box sx={{ mb: 2 }}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="body2">{statusMessage}</Typography>
-            </CardContent>
-          </Card>
-        </Box>
-      )}
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Chip
+          color={status.color === 'default' ? undefined : status.color}
+          label={status.label}
+          variant={status.color === 'default' ? 'outlined' : 'filled'}
+          data-testid="insight-chip-acwr"
+        />
+        <Chip
+          color={sessionCount ? 'success' : 'default'}
+          label={sessionCount != null ? `${sessionCount} session${sessionCount === 1 ? '' : 's'} this week` : 'No sessions yet'}
+          variant={sessionCount ? 'filled' : 'outlined'}
+          data-testid="insight-chip-sessions"
+        />
+        {nextHrs != null ? (
+          <Chip
+            color="primary"
+            label={nextHrs === 0 ? 'Next session today' : `Next session in ~${nextHrs} h`}
+            variant="outlined"
+            data-testid="insight-chip-next"
+          />
+        ) : null}
+        <Chip
+          color={weeklyReport ? 'success' : 'default'}
+          label={weeklyReport ? 'Weekly data loaded' : 'Awaiting first sync'}
+          variant={weeklyReport ? 'outlined' : 'outlined'}
+        />
+      </Stack>
 
-      {loading ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography color="text.secondary">Loading your weekly stats...</Typography>
-          </CardContent>
-        </Card>
-      ) : summary ? (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 2,
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' }
-          }}
-        >
-          {statCards.map((card) => (
-            <StatsCard key={card.title} hint={card.hint} icon={card.icon} title={card.title} value={card.value} />
-          ))}
-        </Box>
-      ) : (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography color="text.secondary">
-              No activities this week. Start by adding activities or connecting Strava.
-            </Typography>
-          </CardContent>
-        </Card>
-      )}
+      {reportError && weeklyReport ? (
+        <Alert severity="info" sx={{ mb: 2 }}>{reportError}</Alert>
+      ) : null}
 
-      <Card variant="outlined" sx={{ mt: 3 }}>
-        <CardContent>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ sm: 'flex-end' }}>
-            <Box>
-              <Typography variant="overline" color="primary" fontWeight={700}>
-                Workflows
-              </Typography>
-              <Typography variant="h5" fontWeight={700}>
-                Common training actions
-              </Typography>
-            </Box>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 480 }}>
-              Jump straight into the actions you are most likely to need during the week, with larger touch targets and
-              clearer entry points.
+      <Accordion
+        defaultExpanded={false}
+        elevation={0}
+        sx={{ borderRadius: 3, border: 1, borderColor: 'divider', mb: 2, '&:before': { display: 'none' } }}
+        data-testid="home-recent-accordion"
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Recent activities
             </Typography>
+            <Chip size="small" label={recentActivities.length} />
           </Stack>
-          <Box
-            sx={{
-              mt: 3,
-              display: 'grid',
-              gap: 2,
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }
-            }}
-          >
-            {quickActions.map(({ description, icon: Icon, title, to }) => (
-              <Card
-                key={title}
-                component={RouterLink}
-                to={to}
-                variant="outlined"
-                sx={{
-                  textDecoration: 'none',
-                  height: '100%',
-                  transition: 'transform 0.15s, box-shadow 0.15s',
-                  '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
-                }}
-              >
-                <CardContent>
-                  <Box
-                    sx={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 2,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                      mb: 1.5
-                    }}
-                  >
-                    <Icon size={18} />
+        </AccordionSummary>
+        <AccordionDetails>
+          {recentLoading && recentActivities.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">Loading your latest runs…</Typography>
+          ) : recentActivities.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No recent activities. Sync Strava or log a run to start your week.
+            </Typography>
+          ) : (
+            <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />} spacing={0}>
+              {recentActivities.slice(0, 3).map((activity) => (
+                <Stack
+                  key={activity._id || activity.stravaActivityId}
+                  direction={{ xs: 'column', sm: 'row' }}
+                  justifyContent="space-between"
+                  sx={{ py: 1.5 }}
+                  component={RouterLink}
+                  to={`/activities/${activity._id || activity.stravaActivityId}`}
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle2" noWrap>{activity.name || 'Run'}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {activity.date ? new Date(activity.date).toLocaleDateString() : ''} · {activity.type || 'run'}
+                    </Typography>
                   </Box>
-                  <Typography variant="subtitle1" fontWeight={700} color="text.primary" gutterBottom>
-                    {title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {description}
-                  </Typography>
-                </CardContent>
-              </Card>
-            ))}
-          </Box>
-        </CardContent>
-      </Card>
-    </Box>
-  );
-}
+                  <Stack direction="row" spacing={1} sx={{ mt: { xs: 0.5, sm: 0 } }}>
+                    <Chip size="small" variant="outlined" label={`${((activity.distance || 0) / 1000).toFixed(1)} km`} />
+                    <Chip size="small" variant="outlined" label={paceLabel(activity.pace)} />
+                  </Stack>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+        </AccordionDetails>
+      </Accordion>
 
-function SupportLinkCard({ subtitle, title, description, to, icon: Icon }) {
-  return (
-    <Card
-      component={RouterLink}
-      to={to}
-      variant="outlined"
-      sx={{
-        textDecoration: 'none',
-        transition: 'transform 0.15s, box-shadow 0.15s',
-        '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 }
-      }}
-    >
-      <CardContent>
-        <Stack direction="row" spacing={2} alignItems="flex-start">
-          <Box
-            sx={{
-              width: 44,
-              height: 44,
-              borderRadius: 2,
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              flexShrink: 0
-            }}
-          >
-            <Icon size={18} />
-          </Box>
-          <Box>
-            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-              {subtitle}
-            </Typography>
-            <Typography variant="subtitle1" fontWeight={700} color="text.primary" display="block" sx={{ mt: 0.5 }}>
-              {title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {description}
-            </Typography>
-          </Box>
-        </Stack>
-      </CardContent>
-    </Card>
+      <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+        <Button
+          component={RouterLink}
+          to="/training-report"
+          variant="text"
+        >
+          Open full training report →
+        </Button>
+      </Box>
+    </Box>
   );
 }
 
