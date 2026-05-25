@@ -28,8 +28,8 @@ function buildLoadRiskAssessment(activities = [], user = {}) {
   }
 
   return {
-    acuteWeeklyKm: Number(acuteKm.toFixed(1)),
-    chronicWeeklyKm: Number(chronicKm.toFixed(1)),
+    acuteWeeklyKm: Number(acuteKm.toFixed(2)),
+    chronicWeeklyKm: Number(chronicKm.toFixed(2)),
     acuteChronicRatio: Number(ratio.toFixed(2)),
     weeklyTargetKm: target,
     risk,

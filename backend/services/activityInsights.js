@@ -1,11 +1,12 @@
 const { compareSplitProfiles } = require('./vectorSegments');
+const { round, formatPaceMinPerKm } = require('../utils/numbers');
 
 function formatPace(minPerKm) {
   if (!minPerKm || !Number.isFinite(minPerKm)) {
     return null;
   }
 
-  return `${minPerKm.toFixed(1)} min/km`;
+  return formatPaceMinPerKm(minPerKm);
 }
 
 /**
@@ -59,7 +60,7 @@ function buildActivityInsight(activity, stravaDetail = null) {
   const distanceKm = Number(activity?.distance || 0) / 1000;
 
   if (elev > 150 && distanceKm > 0) {
-    lines.push(`Climbing ${Math.round(elev)} m over ${distanceKm.toFixed(1)} km — factor terrain into recovery and next-week load.`);
+    lines.push(`Climbing ${Math.round(elev)} m over ${round(distanceKm)} km — factor terrain into recovery and next-week load.`);
   }
 
   if (stravaDetail?.suffer_score) {

@@ -1,5 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
+import Accordion from '@mui/material/Accordion';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
@@ -14,22 +17,19 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { activitiesApi } from '../services/api';
 import ActivityCard from '../components/ActivityCard';
+import ActivityStatStrip from '../components/ActivityStatStrip';
+import WeeklyProgressRing from '../components/WeeklyProgressRing';
 import DeleteActivityDialog from '../components/DeleteActivityDialog';
-import {
-  ActivityIcon,
-  CalendarIcon,
-  DistanceIcon,
-  ElevationIcon,
-  HeartIcon,
-  PaceIcon,
-  TrailIcon
-} from '../components/icons';
+import { ActivityIcon } from '../components/icons';
 import { formatSnapshotTimestamp, loadSnapshot, saveSnapshot } from '../utils/offlineCache';
 import SemanticSearchBar from '../components/SemanticSearchBar';
 import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
+import { useScreenChrome } from '../context/AppShellContext';
 import { getVisibilityLabel, VISIBILITY_OPTIONS } from '../utils/activityVisibility';
+import { formatNumber, formatPaceLabel } from '../utils/format';
 
 const ACTIVITIES_CACHE_KEY = 'activities-feed';
 
@@ -51,12 +51,12 @@ function formatCreatedActivitySummary(activity) {
   const durationMinutes = Math.round(Number(activity.duration || 0) / 60);
   const pace =
     activity.pace != null && Number.isFinite(activity.pace)
-      ? `${Number(activity.pace).toFixed(1)} min/km`
+      ? formatPaceLabel(activity.pace)
       : null;
 
   return [
     activity.name,
-    `${distanceKm.toFixed(2)} km`,
+    `${formatNumber(distanceKm)} km`,
     `${durationMinutes} min`,
     pace,
     getVisibilityLabel(activity.visibility)
@@ -88,6 +88,8 @@ function Activities() {
     notes: '',
     visibility: 'everyone'
   });
+
+  useScreenChrome({ title: 'Activities' });
 
   useEffect(() => {
     fetchActivities();
@@ -129,10 +131,9 @@ function Activities() {
 
   const runActivities = activities.filter((activity) => activity.type?.toLowerCase().includes('run'));
   const paceValues = runActivities.filter((activity) => activity.pace).map((activity) => activity.pace);
-  const averagePace = paceValues.length ? (paceValues.reduce((sum, pace) => sum + pace, 0) / paceValues.length).toFixed(1) : null;
-  const totalDistance = runActivities.length ? (runActivities.reduce((sum, activity) => sum + (activity.distance || 0), 0) / 1000).toFixed(1) : '0.0';
-  const longestRun = runActivities.length ? (Math.max(...runActivities.map((activity) => activity.distance || 0)) / 1000).toFixed(1) : '0.0';
-  const totalElevation = runActivities.reduce((sum, activity) => sum + (activity.elevationGain || 0), 0);
+  const averagePace = paceValues.length ? formatPaceLabel(paceValues.reduce((sum, pace) => sum + pace, 0) / paceValues.length) : null;
+  const totalDistance = runActivities.length ? formatNumber(runActivities.reduce((sum, activity) => sum + (activity.distance || 0), 0) / 1000) : '0';
+  const longestRun = runActivities.length ? formatNumber(Math.max(...runActivities.map((activity) => activity.distance || 0)) / 1000) : '0';
 
   const handleAddActivity = async (e) => {
     e.preventDefault();
@@ -242,58 +243,16 @@ function Activities() {
         stravaConnected={stravaConnected}
       />
       <SemanticSearchBar />
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} justifyContent="space-between">
-            <Box>
-              <Typography variant="overline" color="primary" fontWeight={700}>
-                Run log
-              </Typography>
-              <Typography variant="h4" component="h1" fontWeight={700} gutterBottom>
-                Run Log & Training Dashboard
-              </Typography>
-              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 560 }}>
-                A mobile-first racing and run tracking experience with pace, distance, and recovery insights.
-              </Typography>
-            </Box>
-            <Card variant="outlined" sx={{ maxWidth: 360, bgcolor: 'action.hover' }}>
-              <CardContent>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 1 }}>
-                  Mobile tip
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Tap &quot;View details&quot; on any activity card to expand notes, pace insights, and recovery cues.
-                </Typography>
-              </CardContent>
-            </Card>
-          </Stack>
-        </CardContent>
-      </Card>
 
-      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={3} alignItems="flex-start">
-        <Stack spacing={3} sx={{ flex: 1, width: 1 }}>
-          <Card variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
-                <Box
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 2,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'primary.main',
-                    color: 'primary.contrastText'
-                  }}
-                >
-                  <ActivityIcon size={18} />
-                </Box>
-                <Typography variant="h5" component="h2" fontWeight={600}>
-                  Manual run log
-                </Typography>
-              </Stack>
-
+      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
+        <Stack spacing={2} sx={{ flex: 1, width: 1 }}>
+          <Accordion variant="outlined" disableGutters sx={{ '&::before': { display: 'none' } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="add-run-content" id="add-run-header">
+              <Typography variant="subtitle2" fontWeight={600}>
+                Add run manually
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ pt: 0 }}>
               <Box ref={formFeedbackRef} sx={{ mb: formFeedback.status !== 'idle' ? 2 : 0 }}>
                 {formFeedback.status === 'submitting' && (
                   <Alert severity="info" icon={<CircularProgress size={18} color="inherit" />}>
@@ -362,7 +321,7 @@ function Activities() {
                 )}
               </Box>
 
-              <Box component="form" onSubmit={handleAddActivity}>
+              <Box id="add-run-form" component="form" onSubmit={handleAddActivity}>
                 <Box
                   sx={{
                     display: 'grid',
@@ -508,61 +467,36 @@ function Activities() {
                   </Box>
                 </Box>
               </Box>
-            </CardContent>
-          </Card>
-
-          <Card variant="outlined">
-            <CardContent>
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-                <Box
-                  sx={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 2,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    bgcolor: 'action.selected'
-                  }}
-                >
-                  <CalendarIcon size={18} />
-                </Box>
-                <Typography variant="h6" fontWeight={600}>
-                  Upcoming race preview
-                </Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                Use Coach Review to attach these activities to your next race and see readiness, risk, and pacing suggestions.
-              </Typography>
-            </CardContent>
-          </Card>
+            </AccordionDetails>
+          </Accordion>
         </Stack>
 
-        <Card variant="outlined" sx={{ width: { xl: 320 }, flexShrink: 0, position: { xl: 'sticky' }, top: { xl: 16 } }}>
-          <CardContent>
-            <Typography variant="h6" fontWeight={600} gutterBottom>
-              Run summary
-            </Typography>
-            <Typography variant="body2" color="text.secondary" paragraph>
-              Your recent training metrics for goal pacing and race readiness.
-            </Typography>
-            <Box sx={{ display: 'grid', gap: 1, gridTemplateColumns: '1fr 1fr' }}>
-              <SummaryMetric icon={ActivityIcon} label="Runs logged" value={runActivities.length} />
-              <SummaryMetric icon={PaceIcon} label="Average pace" value={averagePace ? `${averagePace} min/km` : 'N/A'} />
-              <SummaryMetric icon={DistanceIcon} label="Distance" value={`${totalDistance} km`} />
-              <SummaryMetric icon={TrailIcon} label="Longest run" value={`${longestRun} km`} />
-              <SummaryMetric icon={ElevationIcon} label="Elevation" value={`${totalElevation} m`} />
-              <SummaryMetric
-                icon={HeartIcon}
-                label="Recovery check"
-                value={runActivities.length ? 'Ready for review' : 'Add data first'}
-              />
-            </Box>
+        <Card variant="outlined" sx={{ width: { xl: 280 }, flexShrink: 0, position: { xl: 'sticky' }, top: { xl: 16 } }}>
+          <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
+            {profile?.weeklyTrainingLoadKm > 0 ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1.5 }}>
+                <WeeklyProgressRing
+                  currentKm={Number(totalDistance)}
+                  targetKm={profile.weeklyTrainingLoadKm}
+                  label="Goal"
+                  size={72}
+                />
+              </Box>
+            ) : null}
+            <ActivityStatStrip
+              dense
+              stats={[
+                { label: 'Distance', value: `${totalDistance} km` },
+                { label: 'Runs', value: String(runActivities.length) },
+                { label: 'Pace', value: averagePace || '—' },
+                { label: 'Longest', value: `${longestRun} km` }
+              ]}
+            />
           </CardContent>
         </Card>
       </Stack>
 
-      <Box sx={{ mt: 3 }}>
+      <Box sx={{ mt: 2 }}>
         {listAlert && (
           <Alert
             severity={listAlert.severity}
@@ -581,9 +515,18 @@ function Activities() {
         ) : activities.length === 0 ? (
           <Card variant="outlined">
             <CardContent>
-              <Typography color="text.secondary">
-                No activities found. Start by syncing with Strava or adding a manual activity.
-              </Typography>
+              <Stack spacing={1}>
+                <Typography variant="body2" color="text.secondary">No runs yet.</Typography>
+                <Button
+                  component={RouterLink}
+                  to={stravaConnected ? '#add-run-header' : '/strava-connect'}
+                  variant="outlined"
+                  size="small"
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  {stravaConnected ? 'Add a run' : 'Connect Strava'}
+                </Button>
+              </Stack>
             </CardContent>
           </Card>
         ) : (
@@ -594,22 +537,6 @@ function Activities() {
           </Stack>
         )}
       </Box>
-    </Box>
-  );
-}
-
-function SummaryMetric({ icon: Icon, label, value }) {
-  return (
-    <Box sx={{ p: 1.5, borderRadius: 2, border: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
-      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-        <Icon size={14} />
-        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          {label}
-        </Typography>
-      </Stack>
-      <Typography variant="body2" fontWeight={700}>
-        {value}
-      </Typography>
     </Box>
   );
 }

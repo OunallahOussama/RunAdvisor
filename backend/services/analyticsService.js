@@ -15,17 +15,9 @@
  */
 
 const Activity = require('../models/Activity');
+const { round } = require('../utils/numbers');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function round(value, decimals = 1) {
-  if (!Number.isFinite(Number(value))) {
-    return 0;
-  }
-
-  const factor = 10 ** decimals;
-  return Math.round(Number(value) * factor) / factor;
-}
 
 function isRun(activity = {}) {
   const type = String(activity.type || '').toLowerCase();
@@ -275,7 +267,7 @@ function analyzeActivity(activity, baseline) {
     name: activity.name,
     date: activity.date,
     distanceKm: round(dk, 2),
-    movingMinutes: round(mins, 1),
+    movingMinutes: round(mins),
     avgPaceMinPerKm: pace ? round(pace, 2) : null,
     elevationGainM: Number(activity.elevationGain || 0),
     avgHeartRate: Number(activity.avgHeartRate || 0) || null,
@@ -318,7 +310,7 @@ function buildWeeklyLoadSeries(activities, windowDays) {
       weekStart: start.toISOString().slice(0, 10),
       weekEnd: end.toISOString().slice(0, 10),
       label: `${start.getMonth() + 1}/${start.getDate()}`,
-      totalDistanceKm: round(totalDistanceKm, 1),
+      totalDistanceKm: round(totalDistanceKm),
       totalMovingMinutes: round(totalMinutes, 0),
       load: Math.round(totalLoad),
       activityCount: inWindow.length
@@ -434,8 +426,8 @@ function computeTrends(activities) {
     : null;
 
   return {
-    currentWeekDistanceKm: round(currentWeekKm, 1),
-    previousWeekDistanceKm: round(previousWeekKm, 1),
+    currentWeekDistanceKm: round(currentWeekKm),
+    previousWeekDistanceKm: round(previousWeekKm),
     distanceDeltaPctWoW,
     distanceDeltaPct28d,
     paceDeltaSecPerKmWoW,
@@ -479,7 +471,7 @@ function computePersonalRecords(activities) {
       highestSuffer = { score: Number(a.sufferScore), date: a.date, name: a.name };
     }
     if (dk >= 12 && (!mostRecentLongRun || new Date(a.date) > new Date(mostRecentLongRun.date))) {
-      mostRecentLongRun = { date: a.date, distanceKm: round(dk, 1), name: a.name };
+      mostRecentLongRun = { date: a.date, distanceKm: round(dk), name: a.name };
     }
     const splits = Array.isArray(a.splitsMetric) ? a.splitsMetric : [];
     splits.forEach((s) => {
@@ -495,7 +487,7 @@ function computePersonalRecords(activities) {
   });
 
   return {
-    longestRunKm: round(longestRunKm, 1),
+    longestRunKm: round(longestRunKm),
     biggestClimbM: round(biggestClimbM, 0),
     fastestPaceMinPerKm: Number.isFinite(fastestPace) ? round(fastestPace, 2) : 0,
     fastestKilometerPaceMinPerKm: Number.isFinite(fastestKmPace) ? round(fastestKmPace, 2) : 0,
@@ -579,11 +571,11 @@ async function buildAnalytics(userIdOrActivities, options = {}) {
       lastActivityDate: activities[activities.length - 1].date
     },
     volume: {
-      totalDistanceKm: round(totalDistanceKm, 1),
+      totalDistanceKm: round(totalDistanceKm),
       totalMovingMinutes: round(totalMovingMinutes, 0),
-      runsPerWeek: round(activities.length / weeks, 1),
+      runsPerWeek: round(activities.length / weeks),
       avgDistanceKm: round(totalDistanceKm / activities.length, 2),
-      longestRunKm: round(longestRunKm, 1),
+      longestRunKm: round(longestRunKm),
       totalElevationM: round(totalElevationM, 0)
     },
     pace: {

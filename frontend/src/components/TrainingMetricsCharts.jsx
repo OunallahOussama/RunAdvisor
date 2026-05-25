@@ -19,6 +19,7 @@ import {
   Title
 } from 'chart.js';
 import { Chart } from 'react-chartjs-2';
+import { chartTooltipCallbacks } from '../utils/format';
 
 ChartJS.register(
   CategoryScale,
@@ -49,7 +50,10 @@ const baseChartOptions = (theme, { title } = {}) => ({
   interaction: { mode: 'index', intersect: false },
   plugins: {
     legend: { labels: { color: theme.text } },
-    title: title ? { display: true, text: title, color: theme.text, font: { size: 13, weight: '600' } } : { display: false }
+    title: title ? { display: true, text: title, color: theme.text, font: { size: 13, weight: '600' } } : { display: false },
+    tooltip: {
+      callbacks: chartTooltipCallbacks({ paceDatasetLabels: ['pace', 'Pace'] })
+    }
   }
 });
 

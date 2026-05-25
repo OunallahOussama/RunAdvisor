@@ -100,7 +100,7 @@ function buildTrainingProgress(activities = [], user = {}) {
   }
 
   return {
-    weeklyDistanceKm: Number(weeklyDistanceKm.toFixed(1)),
+    weeklyDistanceKm: Number(weeklyDistanceKm.toFixed(2)),
     weeklyLoadTargetKm: weeklyLoadTarget,
     loadProgressPct,
     goalPaceMinPerKm: goalPace,

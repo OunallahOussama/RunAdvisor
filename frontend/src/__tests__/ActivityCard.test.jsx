@@ -1,6 +1,6 @@
 import React from 'react';
 import { MemoryRouter } from 'react-router-dom';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import ActivityCard from '../components/ActivityCard';
 import { ThemeProvider } from '../context/ThemeContext';
 
@@ -33,7 +33,7 @@ describe('ActivityCard', () => {
     notes: 'Felt strong on the final kilometer.'
   };
 
-  it('renders summary information and toggles details', () => {
+  it('renders summary and links to the activity page', () => {
     const onDelete = jest.fn();
     render(
       <MemoryRouter>
@@ -44,11 +44,8 @@ describe('ActivityCard', () => {
     );
 
     expect(screen.getByText(/Morning Run/i)).toBeInTheDocument();
-    expect(screen.getByText(/5.00 km/)).toBeInTheDocument();
-    expect(screen.getByText(/View details/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /open full page/i })).toHaveAttribute('href', '/activities/abc123');
-
-    fireEvent.click(screen.getByText(/View details/i));
-    expect(screen.getByText(/Felt strong on the final kilometer/i)).toBeInTheDocument();
+    expect(screen.getByText(/5 km/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Morning Run/i })).toHaveAttribute('href', '/activities/abc123');
+    expect(screen.queryByText(/Details/i)).not.toBeInTheDocument();
   });
 });

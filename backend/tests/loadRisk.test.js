@@ -19,12 +19,14 @@ describe('buildLoadRiskAssessment', () => {
 
   it('reports low risk for balanced load', () => {
     const activities = [
-      { date: new Date(now - day), distance: 8000 },
-      { date: new Date(now - 8 * day), distance: 8000 },
-      { date: new Date(now - 15 * day), distance: 8000 }
+      { date: new Date(now - 2 * day), distance: 10000 },
+      { date: new Date(now - 9 * day), distance: 10000 },
+      { date: new Date(now - 16 * day), distance: 10000 },
+      { date: new Date(now - 23 * day), distance: 10000 }
     ];
 
     const result = buildLoadRiskAssessment(activities, { weeklyTrainingLoadKm: 40 });
     expect(result.risk).toBe('low');
+    expect(result.acuteChronicRatio).toBeLessThanOrEqual(1.2);
   });
 });

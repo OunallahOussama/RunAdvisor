@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { coachApi } from '../services/api';
+import { formatNumber, formatPercent } from '../utils/format';
 
 function SemanticSearchBar() {
   const [query, setQuery] = useState('');
@@ -73,7 +74,7 @@ function SemanticSearchBar() {
               >
                 <Typography variant="body2" fontWeight={600}>{run.name}</Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {(run.score * 100).toFixed(0)}% match · {run.distanceKm} km
+                  {formatPercent(run.score * 100)} match · {formatNumber(run.distanceKm)} km
                 </Typography>
               </Box>
             ))}

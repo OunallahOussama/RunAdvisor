@@ -100,7 +100,7 @@ function ContextStrip({ context }) {
 
   const fullMetrics = metrics
     ? [
-        { label: 'Runs/week', value: formatNumber(metrics.runsPerWeek, { digits: 1 }) },
+        { label: 'Runs/week', value: formatNumber(metrics.runsPerWeek) },
         { label: 'Weekly load', value: formatNumber(metrics.weeklyLoad, { digits: 0 }) },
         { label: 'Monotony', value: formatNumber(metrics.monotony, { digits: 2 }) }
       ]

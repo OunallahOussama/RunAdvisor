@@ -62,7 +62,7 @@ function buildWeeklyReport(overrides = {}) {
       heartRate: { avgHeartRate: 148 },
       intensityDistribution: { easy: 72, tempo: 14, threshold: 10, vo2: 4 },
       trainingLoad: { weeklyLoad: 285, acwr: 1.18, monotony: 1.4, strain: 399 },
-      trends: { distanceDeltaPctWoW: 8 },
+      trends: { distanceDeltaPctWoW: 8, paceDeltaSecPerKmWoW: -12 },
       dataQuality: { hasHeartRate: true, hasSplits: true, hasPower: false }
     },
     report: {
@@ -124,7 +124,7 @@ describe('Home (Dashboard) page', () => {
     coachApi.weeklySummary.mockResolvedValue({ data: buildWeeklyReport() });
   });
 
-  it('renders the Smart Weekly Summary as the hero with headline, 4 tiles, 7 plan days, and a View full report link', async () => {
+  it('renders compact weekly insight with headline, plan, and stats link', async () => {
     renderWithProviders(<Dashboard />);
 
     await waitFor(() => expect(coachApi.weeklySummary).toHaveBeenCalled());
@@ -135,30 +135,25 @@ describe('Home (Dashboard) page', () => {
       await screen.findByRole('heading', { name: /Solid build week, recovery looks healthy/i })
     ).toBeInTheDocument();
     expect(screen.getByTestId('readiness-phase-chip')).toHaveTextContent(/build/i);
-    expect(screen.getByText(/You ran 4 times for 32\.4 km\. ACWR 1\.18 is in a healthy build zone\./i)).toBeInTheDocument();
-    expect(screen.getAllByText(/32\.4 km/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Tempo intervals/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/You ran 4 times for 32\.4 km/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/Easy aerobic run/i).length).toBeGreaterThan(0);
 
     const dayTiles = await screen.findAllByTestId('weekly-plan-day');
     expect(dayTiles).toHaveLength(7);
 
-    const fullReportLinks = screen.getAllByRole('link', { name: /full report/i });
-    expect(fullReportLinks.length).toBeGreaterThan(0);
-    expect(fullReportLinks[0].getAttribute('href')).toMatch(/\/training-report/);
+    const statsLink = screen.getByRole('link', { name: /All stats/i });
+    expect(statsLink.getAttribute('href')).toMatch(/\/training-report/);
   });
 
-  it('shows the slim insights strip (ACWR + sessions) and the recent-activities accordion', async () => {
+  it('shows the Today hero with status, next session, and recent feed', async () => {
     renderWithProviders(<Dashboard />);
 
     await waitFor(() => expect(coachApi.weeklySummary).toHaveBeenCalled());
 
-    expect(await screen.findByTestId('insight-chip-acwr')).toBeInTheDocument();
-    expect(screen.getByTestId('insight-chip-sessions')).toHaveTextContent(/4 sessions/i);
-    expect(screen.getByTestId('home-recent-accordion')).toBeInTheDocument();
-
-    // Heavy marketing/duplicate copy from the old dashboard is gone.
-    expect(screen.queryByText(/Training command center/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Welcome to RunAdvisor/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Common training actions/i)).not.toBeInTheDocument();
+    expect(await screen.findByTestId('training-status-banner')).toBeInTheDocument();
+    expect(screen.getByText(/Productive/i)).toBeInTheDocument();
+    expect(screen.getByTestId('today-hero')).toBeInTheDocument();
+    expect(screen.getAllByText(/Easy aerobic run/i).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('home-recent-feed')).toBeInTheDocument();
   });
 });

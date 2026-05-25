@@ -10,6 +10,7 @@ import {
   Tooltip
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
+import { chartTooltipCallbacks } from '../utils/format';
 
 ChartJS.register(
   CategoryScale,
@@ -68,18 +69,7 @@ function TrainingTrendChart({ trend = [] }) {
         }
       },
       tooltip: {
-        callbacks: {
-          label(context) {
-            const label = context.dataset.label || '';
-            const value = context.parsed.y;
-
-            if (value == null) {
-              return `${label}: N/A`;
-            }
-
-            return `${label}: ${value.toFixed(1)}`;
-          }
-        }
+        callbacks: chartTooltipCallbacks({ paceDatasetLabels: ['pace', 'Pace'] })
       }
     },
     scales: {

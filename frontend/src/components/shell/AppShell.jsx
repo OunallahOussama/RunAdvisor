@@ -28,6 +28,7 @@ import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import ReplayIcon from '@mui/icons-material/Replay';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
+import StravaStatusIndicator from '../StravaStatusIndicator';
 import ThemeToggleButton from '../ThemeToggleButton';
 import NotificationBell from './NotificationBell';
 import CoachChatWidget from '../coach/CoachChatWidget';
@@ -37,7 +38,7 @@ import { RunAdvisorMark } from '../icons';
 const NAV_ITEMS = [
   { value: '/', label: 'Home', Icon: HomeIcon, match: (p) => p === '/' || p === '/recommendations' },
   { value: '/activities', label: 'Activities', Icon: DirectionsRunIcon, match: (p) => p.startsWith('/activities') },
-  { value: '/training-report', label: 'Report', Icon: AssessmentIcon, match: (p) => p.startsWith('/training-report') },
+  { value: '/training-report', label: 'Stats', Icon: AssessmentIcon, match: (p) => p.startsWith('/training-report') },
   { value: '/profile', label: 'Profile', Icon: PersonIcon, match: (p) => p.startsWith('/profile') }
 ];
 
@@ -190,6 +191,7 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
             {title}
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.5}>
+            {!isMobile ? <StravaStatusIndicator compact /> : null}
             <ThemeToggleButton />
             <NotificationBell enabled={Boolean(user)} consent={consent} />
             <ProfileMenu user={user} onLogout={onLogout} onReplayTour={onReplayTour} />

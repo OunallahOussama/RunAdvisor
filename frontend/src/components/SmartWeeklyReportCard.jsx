@@ -27,6 +27,7 @@ import {
   TrendIcon
 } from './icons';
 import { WeeklyPlanGrid } from './WeeklyPlanDayCard';
+import { formatNumber, formatPaceLabel, formatDeltaPercent, formatPaceDeltaSec, TRAINING_METRIC_TOOLTIPS } from '../utils/format';
 
 const WINDOW_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
@@ -43,25 +44,6 @@ const READINESS_CHIP_COLOR = {
   taper: 'secondary',
   peak: 'success'
 };
-
-function formatPaceLabel(minPerKm) {
-  const value = Number(minPerKm);
-  if (!Number.isFinite(value) || value <= 0) {
-    return '—';
-  }
-  const mins = Math.floor(value);
-  const secs = Math.round((value - mins) * 60);
-  return `${mins}:${String(secs).padStart(2, '0')} /km`;
-}
-
-function formatNumber(value, { digits = 1, suffix = '' } = {}) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) {
-    return '—';
-  }
-  const fixed = v.toFixed(digits).replace(/\.0+$/, '');
-  return `${fixed}${suffix}`;
-}
 
 function relativeTimeFromNow(value) {
   if (!value) {
@@ -94,16 +76,15 @@ function readinessChipColor(phase = '') {
   return READINESS_CHIP_COLOR[String(phase).toLowerCase()] || 'default';
 }
 
-function StatTile({ label, value, sublabel, icon: Icon, accent }) {
-  return (
+function StatTile({ label, value, sublabel, icon: Icon, accent, tooltip }) {
+  const tile = (
     <Card
       variant="outlined"
       sx={{
-        bgcolor: accent
-          ? 'primary.main'
-          : 'action.hover',
+        bgcolor: accent ? 'primary.main' : 'action.hover',
         color: accent ? 'primary.contrastText' : 'text.primary',
-        minHeight: 96
+        minHeight: 96,
+        height: '100%'
       }}
     >
       <CardContent sx={{ pb: '12px !important', py: 1.5 }}>
@@ -160,6 +141,16 @@ function StatTile({ label, value, sublabel, icon: Icon, accent }) {
         </Stack>
       </CardContent>
     </Card>
+  );
+
+  if (!tooltip) {
+    return tile;
+  }
+
+  return (
+    <Tooltip title={tooltip} arrow placement="top">
+      <Box sx={{ height: '100%' }}>{tile}</Box>
+    </Tooltip>
   );
 }
 
@@ -248,7 +239,8 @@ function SmartWeeklyReportCard({
   onWindowChange,
   onRefresh,
   refreshing = false,
-  stravaConnected = false
+  stravaConnected = false,
+  compact = false
 }) {
   const analytics = data?.analytics || null;
   const report = data?.report || null;
@@ -264,29 +256,40 @@ function SmartWeeklyReportCard({
   const acwrValue = Number(load.acwr || 0);
   const hasAcwr = Number.isFinite(acwrValue) && acwrValue > 0;
 
+  const trends = analytics?.trends || {};
+  const distanceDelta = formatDeltaPercent(trends.distanceDeltaPctWoW);
+  const paceDelta = formatPaceDeltaSec(trends.paceDeltaSecPerKmWoW);
+
   const stats = [
     {
       label: 'Distance',
-      value: formatNumber(volume.totalDistanceKm, { digits: 1, suffix: ' km' }),
-      sublabel: volume.runsPerWeek ? `${formatNumber(volume.runsPerWeek)} runs/wk` : null,
+      value: formatNumber(volume.totalDistanceKm, { suffix: ' km' }),
+      sublabel: distanceDelta
+        ? `${distanceDelta} vs last week`
+        : volume.runsPerWeek
+          ? `${formatNumber(volume.runsPerWeek)} runs/wk`
+          : null,
       icon: DistanceIcon,
-      accent: true
+      accent: true,
+      tooltip: TRAINING_METRIC_TOOLTIPS.distance
     },
     {
       label: 'Sessions',
       value: String(analytics?.window?.activityCount ?? '—'),
       sublabel: volume.longestRunKm
-        ? `Longest ${formatNumber(volume.longestRunKm, { digits: 1, suffix: ' km' })}`
+        ? `Longest ${formatNumber(volume.longestRunKm, { suffix: ' km' })}`
         : null,
-      icon: ActivityIcon
+      icon: ActivityIcon,
+      tooltip: TRAINING_METRIC_TOOLTIPS.sessions
     },
     {
       label: 'Avg pace',
       value: formatPaceLabel(pace.avgPaceMinPerKm),
-      sublabel: pace.fastestPaceMinPerKm
+      sublabel: paceDelta || (pace.fastestPaceMinPerKm
         ? `Fastest ${formatPaceLabel(pace.fastestPaceMinPerKm)}`
-        : null,
-      icon: PaceIcon
+        : null),
+      icon: PaceIcon,
+      tooltip: TRAINING_METRIC_TOOLTIPS.avgPace
     },
     hasAcwr
       ? {
@@ -298,13 +301,15 @@ function SmartWeeklyReportCard({
               : load.acwr < 0.8
                 ? 'Conservative'
                 : 'Healthy zone',
-          icon: TrendIcon
+          icon: TrendIcon,
+          tooltip: TRAINING_METRIC_TOOLTIPS.acwr
         }
       : {
           label: 'Weekly load',
           value: formatNumber(load.weeklyLoad, { digits: 0 }) || '0',
           sublabel: load.monotony ? `Monotony ${formatNumber(load.monotony, { digits: 2 })}` : null,
-          icon: TrendIcon
+          icon: TrendIcon,
+          tooltip: TRAINING_METRIC_TOOLTIPS.weeklyLoad
         }
   ];
 
@@ -323,46 +328,57 @@ function SmartWeeklyReportCard({
           alignItems={{ sm: 'flex-start' }}
         >
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
-              <Chip color="primary" icon={<CoachIcon size={14} />} label="Smart weekly summary" size="small" />
-              {phase ? (
-                <Chip
-                  data-testid="readiness-phase-chip"
-                  size="small"
-                  color={readinessChipColor(phase)}
-                  label={`Phase: ${phase}`}
-                />
-              ) : null}
-              {source ? (
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={
-                    source === 'openai'
-                      ? 'AI-generated'
-                      : source === 'fallback'
-                        ? 'Rule-based'
-                        : source === 'fallback_error'
-                          ? 'Fallback (AI error)'
+            {!compact ? (
+              <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+                <Chip color="primary" icon={<CoachIcon size={14} />} label="Smart weekly summary" size="small" />
+                {phase ? (
+                  <Chip
+                    data-testid="readiness-phase-chip"
+                    size="small"
+                    color={readinessChipColor(phase)}
+                    label={`Phase: ${phase}`}
+                  />
+                ) : null}
+                {source && !compact ? (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={
+                      source === 'openai'
+                        ? 'AI-generated'
+                        : source === 'fallback'
+                          ? 'Rule-based'
                           : source
-                  }
-                />
-              ) : null}
-              {fromCache ? (
-                <Chip size="small" variant="outlined" label="Cached" />
-              ) : null}
-              {generatedRel ? (
-                <Typography variant="caption" color="text.secondary">
-                  Updated {generatedRel}
-                </Typography>
-              ) : null}
-            </Stack>
-            <Typography variant="h5" fontWeight={700} sx={{ mt: 1, lineHeight: 1.2 }}>
-              {exec?.headline || (loading ? 'Generating your weekly report…' : 'Smart weekly summary')}
+                    }
+                  />
+                ) : null}
+                {fromCache ? (
+                  <Chip size="small" variant="outlined" label="Cached" />
+                ) : null}
+                {generatedRel ? (
+                  <Typography variant="caption" color="text.secondary">
+                    Updated {generatedRel}
+                  </Typography>
+                ) : null}
+              </Stack>
+            ) : null}
+            <Typography variant={compact ? 'h6' : 'h5'} fontWeight={700} sx={{ mt: compact ? 0 : 1, lineHeight: 1.2 }}>
+              {exec?.headline || (loading ? 'Loading…' : compact ? 'Weekly insight' : 'Smart weekly summary')}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-              Real analytics + coach-style narrative, generated from your recent training.
-            </Typography>
+            {compact && phase ? (
+              <Chip
+                data-testid="readiness-phase-chip"
+                size="small"
+                color={readinessChipColor(phase)}
+                label={phase}
+                sx={{ mt: 0.75, textTransform: 'capitalize' }}
+              />
+            ) : null}
+            {!compact ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                Real analytics + coach-style narrative, generated from your recent training.
+              </Typography>
+            ) : null}
           </Box>
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
@@ -404,10 +420,11 @@ function SmartWeeklyReportCard({
             <Button
               component={RouterLink}
               to={`/training-report?windowDays=${windowDays}`}
-              variant="contained"
-              startIcon={<CoachIcon size={16} />}
+              variant={compact ? 'text' : 'contained'}
+              size="small"
+              startIcon={compact ? null : <CoachIcon size={16} />}
             >
-              View full report
+              {compact ? 'All stats' : 'View full report'}
             </Button>
           </Stack>
         </Stack>
@@ -446,42 +463,35 @@ function SmartWeeklyReportCard({
           </Alert>
         ) : data ? (
           <Stack spacing={2} sx={{ mt: 2 }}>
-            <Box
-              sx={{
-                display: 'grid',
-                gap: 1.5,
-                gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }
-              }}
-            >
-              {stats.map((s) => (
-                <StatTile
-                  key={s.label}
-                  label={s.label}
-                  value={s.value}
-                  sublabel={s.sublabel}
-                  icon={s.icon}
-                  accent={s.accent}
-                />
-              ))}
-            </Box>
-
-            {exec?.paragraph ? (
+            {!compact ? (
               <Box
                 sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  bgcolor: 'action.hover',
-                  borderLeft: 4,
-                  borderColor: 'primary.main'
+                  display: 'grid',
+                  gap: 1.5,
+                  gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }
                 }}
               >
-                <Typography variant="body2" sx={{ lineHeight: 1.7 }}>
-                  {exec.paragraph}
-                </Typography>
+                {stats.map((s) => (
+                  <StatTile
+                    key={s.label}
+                    label={s.label}
+                    value={s.value}
+                    sublabel={s.sublabel}
+                    icon={s.icon}
+                    accent={s.accent}
+                    tooltip={s.tooltip}
+                  />
+                ))}
               </Box>
             ) : null}
 
-            {Array.isArray(report?.workloadAnalysis?.flags) && report.workloadAnalysis.flags.length > 0 ? (
+            {exec?.paragraph ? (
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+                {compact && exec.paragraph.length > 220 ? `${exec.paragraph.slice(0, 220).trim()}…` : exec.paragraph}
+              </Typography>
+            ) : null}
+
+            {!compact && Array.isArray(report?.workloadAnalysis?.flags) && report.workloadAnalysis.flags.length > 0 ? (
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {report.workloadAnalysis.flags.map((flag) => (
                   <Chip
@@ -496,32 +506,34 @@ function SmartWeeklyReportCard({
               </Stack>
             ) : null}
 
-            <NextSessionMini next={report?.nextSessionDetail} />
+            {!compact ? <NextSessionMini next={report?.nextSessionDetail} /> : null}
 
             <WeeklyPlanGrid
               weeklyPlan={report?.weeklyPlan}
               planStartDate={data?.generatedAt || report?.generatedAt}
-              nextSessionDetail={report?.nextSessionDetail}
+              nextSessionDetail={compact ? null : report?.nextSessionDetail}
               stravaConnected={stravaConnected}
             />
 
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              justifyContent="flex-end"
-              sx={{ pt: 0.5 }}
-            >
-              <Button
-                component={RouterLink}
-                to={`/training-report?windowDays=${windowDays}`}
-                size="small"
-                variant="text"
-                startIcon={<TargetIcon size={14} />}
+            {!compact ? (
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                justifyContent="flex-end"
+                sx={{ pt: 0.5 }}
               >
-                Open full Training Report →
-              </Button>
-            </Stack>
+                <Button
+                  component={RouterLink}
+                  to={`/training-report?windowDays=${windowDays}`}
+                  size="small"
+                  variant="text"
+                  startIcon={<TargetIcon size={14} />}
+                >
+                  Open full Training Report →
+                </Button>
+              </Stack>
+            ) : null}
           </Stack>
         ) : null}
       </CardContent>

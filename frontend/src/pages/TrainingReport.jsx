@@ -27,6 +27,7 @@ import { Bar, Line } from 'react-chartjs-2';
 import { recommendationsApi } from '../services/api';
 import WeeklyPlanDayCard from '../components/WeeklyPlanDayCard';
 import { DAY_LABELS } from '../utils/weeklyPlanShared';
+import { formatNumber, formatPaceLabel, formatMetric, formatPaceDeltaSec, TRAINING_METRIC_TOOLTIPS } from '../utils/format';
 import { chartScaleOptions, getChartTheme } from '../utils/chartTheme';
 import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 
@@ -48,22 +49,10 @@ const WINDOW_OPTIONS = [
   { value: 120, label: 'Last 4 months' }
 ];
 
-function paceLabel(minPerKm) {
-  const v = Number(minPerKm);
-  if (!Number.isFinite(v) || v <= 0) {
-    return '—';
-  }
-  const mins = Math.floor(v);
-  const secs = Math.round((v - mins) * 60);
-  return `${mins}:${String(secs).padStart(2, '0')} /km`;
-}
-
-function fmt(value, suffix = '', digits = 1) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) {
-    return '—';
-  }
-  return `${v.toFixed(digits).replace(/\.0+$/, '')}${suffix}`;
+function fmt(value, suffix = '', digits = 2) {
+  return formatMetric(value, null, { digits, fallback: '—' }) === '—'
+    ? '—'
+    : `${formatNumber(value, { digits })}${suffix}`;
 }
 
 function formatDate(value) {
@@ -348,7 +337,7 @@ function SplitsTable({ activities }) {
                 {a.name || 'Unnamed run'}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {formatDate(a.date)} • {fmt(a.distanceKm, ' km', 2)} • {paceLabel(a.avgPaceMinPerKm)}
+                {formatDate(a.date)} • {fmt(a.distanceKm, ' km', 2)} • {formatPaceLabel(a.avgPaceMinPerKm)}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
@@ -414,7 +403,7 @@ function SplitsTable({ activities }) {
                         }}
                       >
                         <Box component="td" sx={{ py: 0.75, pr: 1.5, fontWeight: 500 }}>{s.km}</Box>
-                        <Box component="td" sx={{ py: 0.75, pr: 1.5, fontFamily: 'monospace' }}>{paceLabel(s.pace)}</Box>
+                        <Box component="td" sx={{ py: 0.75, pr: 1.5, fontFamily: 'monospace' }}>{formatPaceLabel(s.pace)}</Box>
                         <Box component="td" sx={{ py: 0.75, pr: 1.5 }}>{s.avgHr ?? '—'}</Box>
                         <Box component="td" sx={{ py: 0.75, pr: 1.5 }}>{s.elevDiffM != null ? `${s.elevDiffM} m` : '—'}</Box>
                       </Box>
@@ -460,7 +449,7 @@ function PaceBandPill({ band }) {
         borderColor: alpha(theme.palette.info.main, 0.35)
       }}
     >
-      {paceLabel(band.lowerMinPerKm)} – {paceLabel(band.upperMinPerKm)}
+      {formatPaceLabel(band.lowerMinPerKm)} – {formatPaceLabel(band.upperMinPerKm)}
     </Box>
   );
 }
@@ -543,7 +532,7 @@ function FourWeekOutlook({ outlook }) {
             {week.focus}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            {fmt(week.volumeKm, ' km', 1)} • {week.qualitySessions || 0} quality
+            {fmt(week.volumeKm, ' km')} • {week.qualitySessions || 0} quality
           </Typography>
           {week.notes ? (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
@@ -771,6 +760,7 @@ function TrainingReport() {
               label="Weekly load (TRIMP)"
               value={fmt(load.weeklyLoad, '', 0)}
               sublabel={`vs ${fmt(trends.previousWeekLoad, '', 0)} last week`}
+              tooltip={TRAINING_METRIC_TOOLTIPS.weeklyLoad}
             />
             <StatCard
               label="ACWR (7d : 28d)"
@@ -790,6 +780,7 @@ function TrainingReport() {
               label="Strain"
               value={fmt(load.strain, '', 0)}
               sublabel="Weekly load × monotony"
+              tooltip={TRAINING_METRIC_TOOLTIPS.strain}
             />
           </Box>
           <ParagraphCard>{report.workloadAnalysis?.paragraph || '—'}</ParagraphCard>
@@ -812,10 +803,14 @@ function TrainingReport() {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 1.5 }}>
             <StatCard
               label="Average pace"
-              value={paceLabel(analytics?.pace?.avgPaceMinPerKm)}
-              sublabel={`${fmt(volume.totalDistanceKm, ' km', 1)} over ${analytics?.window?.activityCount || 0} runs`}
+              value={formatPaceLabel(analytics?.pace?.avgPaceMinPerKm)}
+              sublabel={
+                formatPaceDeltaSec(trends.paceDeltaSecPerKmWoW) ||
+                `${fmt(volume.totalDistanceKm, ' km')} over ${analytics?.window?.activityCount || 0} runs`
+              }
+              tooltip={TRAINING_METRIC_TOOLTIPS.avgPace}
             />
-            <StatCard label="Fastest pace" value={paceLabel(analytics?.pace?.fastestPaceMinPerKm)} />
+            <StatCard label="Fastest pace" value={formatPaceLabel(analytics?.pace?.fastestPaceMinPerKm)} />
             <StatCard
               label="Avg heart rate"
               value={analytics?.heartRate?.avgHeartRate ? `${analytics.heartRate.avgHeartRate} bpm` : '—'}

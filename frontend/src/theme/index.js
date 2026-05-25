@@ -351,6 +351,35 @@ function buildComponents(palette) {
         }
       }
     },
+    MuiCardActionArea: {
+      styleOverrides: {
+        root: {
+          borderRadius: 'inherit',
+          '&:hover .MuiCardActionArea-focusHighlight': {
+            opacity: isDark ? 0.06 : 0.04
+          }
+        }
+      }
+    },
+    MuiLinearProgress: {
+      styleOverrides: {
+        root: {
+          borderRadius: 999,
+          height: 8,
+          bgcolor: alpha(palette.primary.main, isDark ? 0.12 : 0.08)
+        },
+        bar: {
+          borderRadius: 999
+        }
+      }
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 12
+        }
+      }
+    },
     MuiTooltip: {
       defaultProps: { arrow: true },
       styleOverrides: {

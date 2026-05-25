@@ -1,3 +1,5 @@
+export { formatNumber, formatPaceLabel, formatPercent, formatMetric, formatChartTooltipValue, chartTooltipCallbacks } from './format';
+
 export const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export const SESSION_TYPE_THEME = {
@@ -17,24 +19,6 @@ const DEFAULT_SESSION = {
   label: 'Session'
 };
 
-export function formatPaceLabel(minPerKm) {
-  const value = Number(minPerKm);
-  if (!Number.isFinite(value) || value <= 0) {
-    return '—';
-  }
-  const mins = Math.floor(value);
-  const secs = Math.round((value - mins) * 60);
-  return `${mins}:${String(secs).padStart(2, '0')} /km`;
-}
-
-export function formatNumber(value, { digits = 1, suffix = '' } = {}) {
-  const v = Number(value);
-  if (!Number.isFinite(v)) {
-    return '—';
-  }
-  const fixed = v.toFixed(digits).replace(/\.0+$/, '');
-  return `${fixed}${suffix}`;
-}
 
 /** Session accent colors; pass palette.mode for readable dark-mode variants. */
 export function sessionTheme(sessionType, mode = 'light') {

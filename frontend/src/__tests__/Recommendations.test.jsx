@@ -72,7 +72,7 @@ describe('Recommendations route', () => {
       </ThemeProvider>
     );
 
-    expect(await screen.findByRole('heading', { name: /Weekly training overview/i })).toBeInTheDocument();
+    expect(await screen.findByTestId('today-hero')).toBeInTheDocument();
     await waitFor(() => expect(coachApi.weeklySummary).toHaveBeenCalled());
     await waitFor(() => expect(activitiesApi.getActivities).toHaveBeenCalled());
   });

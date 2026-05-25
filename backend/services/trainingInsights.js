@@ -1,13 +1,5 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function round(value, decimals = 1) {
-  if (!Number.isFinite(value)) {
-    return 0;
-  }
-
-  const factor = 10 ** decimals;
-  return Math.round(value * factor) / factor;
-}
+const { round } = require('../utils/numbers');
 
 function safeDate(value) {
   const date = new Date(value);
@@ -251,7 +243,7 @@ function buildDailyMetricsTrend(activities = [], daysBack = 28) {
     date: row.date,
     label: row.label,
     distanceKm: round(row.distanceKm, 2),
-    movingMinutes: round(row.movingMinutes, 1),
+    movingMinutes: round(row.movingMinutes),
     elevationM: round(row.elevationM, 0),
     avgPace: row.paceCount ? round(row.paceSum / row.paceCount, 2) : null,
     avgHeartRate: row.hrCount ? round(row.hrSum / row.hrCount) : null,
@@ -316,7 +308,7 @@ function buildRacePacePrediction(lastWeekActivities = [], raceDistanceKm) {
       const movingMin = Number(a.movingTime || a.duration || 0) / 60;
       ref = {
         distanceKm: round(dk, 2),
-        durationMinutes: round(movingMin, 1),
+        durationMinutes: round(movingMin),
         paceMinPerKm: pace,
         date: a.date
       };
@@ -341,7 +333,7 @@ function buildRacePacePrediction(lastWeekActivities = [], raceDistanceKm) {
     return {
       ...base,
       predictedPaceMinPerKm: round(pace, 2),
-      predictedFinishTimeMinutes: round(T2, 1),
+      predictedFinishTimeMinutes: round(T2),
       predictedFinishTimeLabel: formatRaceFinishClock(T2),
       method: 'riegel_longest_run_last_week',
       confidence,
@@ -375,7 +367,7 @@ function buildRacePacePrediction(lastWeekActivities = [], raceDistanceKm) {
   return {
     ...base,
     predictedPaceMinPerKm: round(pace, 2),
-    predictedFinishTimeMinutes: round(T2, 1),
+    predictedFinishTimeMinutes: round(T2),
     predictedFinishTimeLabel: formatRaceFinishClock(T2),
     method: 'weekly_avg_pace_adjusted',
     confidence: 'medium',
@@ -468,10 +460,10 @@ function buildCoachReview(activities = [], user = {}, options = {}) {
   }
 
   if (summary.avgPace > 0) {
-    nextFocus.push(`Anchor easy runs around ${(summary.avgPace + 0.6).toFixed(1)} to ${(summary.avgPace + 1).toFixed(1)} min/km so key sessions feel fresher.`);
+    nextFocus.push(`Anchor easy runs around ${(summary.avgPace + 0.6).toFixed(2)} to ${(summary.avgPace + 1).toFixed(2)} min/km so key sessions feel fresher.`);
   }
 
-  nextFocus.push(`Keep the next long run near ${Math.max(summary.longestRunKm, summary.avgDistanceKm + 2).toFixed(1)} km without adding more than roughly 10% volume.`);
+  nextFocus.push(`Keep the next long run near ${Math.max(summary.longestRunKm, summary.avgDistanceKm + 2).toFixed(2)} km without adding more than roughly 10% volume.`);
 
   if (summary.avgHeartRate > 0) {
     nextFocus.push(`Watch effort if average heart rate drifts well above ${Math.round(summary.avgHeartRate)} bpm on easy days.`);

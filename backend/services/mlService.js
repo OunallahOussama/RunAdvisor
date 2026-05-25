@@ -29,8 +29,8 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       title: 'Sync-Led Weekly Training Block',
       description: 'Use your synced training load to structure one quality session, one long aerobic run, and enough easy volume to absorb the work.',
       type: 'training_plan',
-      recommendedDistance: Math.max(5, Number((stats.totalDistance * 1.1).toFixed(1))),
-      recommendedPace: Number((stats.avgPace + 0.4).toFixed(1)),
+      recommendedDistance: Math.max(5, Number((stats.totalDistance * 1.1).toFixed(2))),
+      recommendedPace: Number((stats.avgPace + 0.4).toFixed(2)),
       recommendedDuration: Math.round((stats.avgDurationMinutes || 45) * 1.1),
       recommendedType: 'Progression run',
       priority: 'high',
@@ -38,10 +38,10 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       focusArea: 'consistency',
       timeHorizon: 'Next 7 days',
       reasoning: `Based on ${stats.activityCount} synced runs from Strava over ${stats.daysSpan} day(s), you have enough recent data to nudge volume without guessing.`,
-      whyNow: `Your recent block totals ${stats.totalDistance.toFixed(1)} km, which is enough history to tune next week's distance and pacing more precisely.`,
+      whyNow: `Your recent block totals ${stats.totalDistance.toFixed(2)} km, which is enough history to tune next week's distance and pacing more precisely.`,
       actionItems: [
-        `Keep your next long run close to ${Math.max(stats.maxDistance, stats.avgDistance + 2).toFixed(1)} km at a conversational effort.`,
-        `Schedule one controlled quality session at around ${(stats.avgPace - 0.2).toFixed(1)} min/km and protect the day after with easy running.`,
+        `Keep your next long run close to ${Math.max(stats.maxDistance, stats.avgDistance + 2).toFixed(2)} km at a conversational effort.`,
+        `Schedule one controlled quality session at around ${(stats.avgPace - 0.2).toFixed(2)} min/km and protect the day after with easy running.`,
         'Sync Strava again after your next key workout so the coach review can re-balance the following week.'
       ],
       watchOut: 'Do not stack the quality session and the long run back-to-back unless your legs feel fresh within 24 hours.'
@@ -61,10 +61,10 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       confidence: 'high',
       focusArea: 'recovery',
       timeHorizon: 'Next 48 hours',
-      reasoning: `Your average pace of ${stats.avgPace.toFixed(1)} min/km with ${stats.hardSessionCount} quicker session(s) suggests recent training intensity is elevated.`,
+      reasoning: `Your average pace of ${stats.avgPace.toFixed(2)} min/km with ${stats.hardSessionCount} quicker session(s) suggests recent training intensity is elevated.`,
       whyNow: 'Recovery is most useful immediately after a denser or faster block, when adaptation depends on lowering mechanical and cardiovascular strain.',
       actionItems: [
-        `Cap the run at ${(stats.avgDistance * 0.8).toFixed(1)} km and keep the effort around ${(stats.avgPace + 1.5).toFixed(1)} to ${(stats.avgPace + 2).toFixed(1)} min/km.`,
+        `Cap the run at ${(stats.avgDistance * 0.8).toFixed(2)} km and keep the effort around ${(stats.avgPace + 1.5).toFixed(2)} to ${(stats.avgPace + 2).toFixed(2)} min/km.`,
         'Choose flat terrain and finish feeling like you could comfortably continue for another 10 minutes.',
         'If fatigue still lingers afterward, swap the next session for mobility or full rest.'
       ],
@@ -86,7 +86,7 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       reasoning: 'A supplemental endurance session helps balance high-intensity training and improve resilience for future race-specific workouts.',
       whyNow: 'Your pace profile is trending fast enough that endurance support will do more for durability than adding yet another hard workout.',
       actionItems: [
-        `Run ${Math.max(stats.avgDistance, stats.maxDistance * 0.9).toFixed(1)} km at around ${(stats.avgPace + 0.8).toFixed(1)} to ${(stats.avgPace + 1.2).toFixed(1)} min/km.`,
+        `Run ${Math.max(stats.avgDistance, stats.maxDistance * 0.9).toFixed(2)} km at around ${(stats.avgPace + 0.8).toFixed(2)} to ${(stats.avgPace + 1.2).toFixed(2)} min/km.`,
         'Keep cadence relaxed and finish the final 10 minutes stronger only if breathing stays controlled.',
         'Hydrate and fuel as if this were a dress rehearsal for a future race-specific long run.'
       ],
@@ -107,10 +107,10 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       confidence: 'medium',
       focusArea: 'long_run',
       timeHorizon: 'Next long run',
-      reasoning: `Your longest run in this review window was ${stats.maxDistance.toFixed(1)} km. A small extension will build aerobic base without a sharp volume jump.`,
+      reasoning: `Your longest run in this review window was ${stats.maxDistance.toFixed(2)} km. A small extension will build aerobic base without a sharp volume jump.`,
       whyNow: 'The safest time to extend endurance is when the target increase stays close to 10% and recent training has been reasonably consistent.',
       actionItems: [
-        `Extend your next long run to ${(stats.maxDistance * 1.1).toFixed(1)} km and keep the first two thirds truly easy.`,
+        `Extend your next long run to ${(stats.maxDistance * 1.1).toFixed(2)} km and keep the first two thirds truly easy.`,
         'Take fuel or fluids if the session runs beyond an hour so the effort stays aerobic instead of turning into a grind.',
         'Log post-run notes about how your legs felt in the final 20 minutes to guide the next build step.'
       ],
@@ -151,10 +151,10 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       confidence: 'medium',
       focusArea: 'speed',
       timeHorizon: 'This week',
-      reasoning: `Current average pace is ${stats.avgPace.toFixed(1)} min/km. One structured faster session can improve economy without overhauling the whole week.`,
+      reasoning: `Current average pace is ${stats.avgPace.toFixed(2)} min/km. One structured faster session can improve economy without overhauling the whole week.`,
       whyNow: 'You appear to have enough aerobic work in place that a controlled tempo stimulus should sharpen pace efficiently.',
       actionItems: [
-        `Try a 10-minute warm-up, 3 x 8 minutes near ${(stats.avgPace - 0.7).toFixed(1)} to ${(stats.avgPace - 1).toFixed(1)} min/km, then a relaxed cooldown.`,
+        `Try a 10-minute warm-up, 3 x 8 minutes near ${(stats.avgPace - 0.7).toFixed(2)} to ${(stats.avgPace - 1).toFixed(2)} min/km, then a relaxed cooldown.`,
         'Keep recoveries easy jogs, not standing rests, so the workout stays race-useful.',
         'Follow the session with an easy day instead of another moderate run.'
       ],
@@ -183,12 +183,12 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
       whyNow: `A ${raceDistance} km event rewards specific pacing practice more than generic extra mileage at this stage.`,
       actionItems: raceDays <= 14
         ? [
-          `Keep one short sharpening workout near ${targetPace.toFixed(1)} min/km and cut back the rest of the week's volume.`,
+          `Keep one short sharpening workout near ${targetPace.toFixed(2)} min/km and cut back the rest of the week's volume.`,
           'Prioritize sleep and avoid experimenting with new shoes, workouts, or fueling in the final days.',
           'Use easy runs to stay loose, not to chase fitness.'
         ]
         : [
-          `Plan one race-pace session that covers roughly ${(raceDistance * 0.6).toFixed(1)} km of total work at or just slower than ${targetPace.toFixed(1)} min/km.`,
+          `Plan one race-pace session that covers roughly ${(raceDistance * 0.6).toFixed(2)} km of total work at or just slower than ${targetPace.toFixed(2)} min/km.`,
           'Pair that workout with one easy or recovery day before and after to preserve quality.',
           'Reassess pace after the session instead of locking in a goal too early.'
         ],
@@ -212,7 +212,7 @@ function buildRecommendations(userId, recentActivities, user, raceContext = {}) 
         reasoning: 'A long run with race-like pacing builds confidence and exposes fueling or pacing issues while there is still time to adjust.',
         whyNow: 'The window is short enough that specificity matters, but still long enough to recover from one demanding long session.',
         actionItems: [
-          `Aim for ${Math.min(raceDistance * 0.9, stats.maxDistance * 1.15).toFixed(1)} km with sections that mirror race terrain or effort.`,
+          `Aim for ${Math.min(raceDistance * 0.9, stats.maxDistance * 1.15).toFixed(2)} km with sections that mirror race terrain or effort.`,
           'Practice fueling and hydration exactly as you expect to do on race day.',
           'Take the following day very easy or fully off so the workout becomes productive instead of draining.'
         ],

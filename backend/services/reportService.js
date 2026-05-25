@@ -99,7 +99,7 @@ function buildFallbackReport(analytics, user = {}, options = {}) {
       sessionType: 'easy_run',
       title: 'Easy aerobic run',
       durationMinutes: 45,
-      distanceKm: Math.max(5, Number(((analytics.volume?.avgDistanceKm || 6) * 0.85).toFixed(1))),
+      distanceKm: Math.max(5, Number(((analytics.volume?.avgDistanceKm || 6) * 0.85).toFixed(2))),
       targetPace: paceBand(easyPace, 0.3),
       rpe: 4,
       description: 'Conversational pace from start to finish. Nose-breathing-ish effort.'
@@ -129,7 +129,7 @@ function buildFallbackReport(analytics, user = {}, options = {}) {
       sessionType: 'easy_run',
       title: 'Recovery jog',
       durationMinutes: 35,
-      distanceKm: Math.max(4, Number(((analytics.volume?.avgDistanceKm || 6) * 0.6).toFixed(1))),
+      distanceKm: Math.max(4, Number(((analytics.volume?.avgDistanceKm || 6) * 0.6).toFixed(2))),
       targetPace: paceBand(easyPace + 0.4, 0.4),
       rpe: 3,
       description: 'Slow shake-out, focus on cadence and posture.'
@@ -149,7 +149,7 @@ function buildFallbackReport(analytics, user = {}, options = {}) {
       sessionType: 'easy_run',
       title: 'Easy run with strides',
       durationMinutes: 40,
-      distanceKm: Math.max(5, Number(((analytics.volume?.avgDistanceKm || 6) * 0.75).toFixed(1))),
+      distanceKm: Math.max(5, Number(((analytics.volume?.avgDistanceKm || 6) * 0.75).toFixed(2))),
       targetPace: paceBand(easyPace, 0.3),
       rpe: 4,
       description: 'Add 6 × 20 s strides in the last 10 minutes.'

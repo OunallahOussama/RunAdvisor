@@ -16,9 +16,10 @@ import {
   isNotificationSupported,
   requestNotificationPermission
 } from '../utils/notifications';
-import { TargetIcon } from '../components/icons';
+import PaceInput, { paceFieldsFromDecimal } from '../components/PaceInput';
+import { minSecToDecimalPace, formatMetric, getRaceCountdown } from '../utils/format';
 import PrivacyConsentPanel from '../components/PrivacyConsentPanel';
-import { useAppShell } from '../context/AppShellContext';
+import { useAppShell, useScreenChrome } from '../context/AppShellContext';
 
 const GOAL_OPTIONS = ['endurance', 'speed', 'recovery', 'race', 'consistency'];
 
@@ -38,7 +39,10 @@ function TrainingProfile() {
   });
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
+  const [paceFields, setPaceFields] = useState({ minutes: '6', seconds: '00' });
   const [notificationsOn, setNotificationsOn] = useState(getNotificationPreference());
+
+  useScreenChrome({ title: 'Profile' });
 
   useEffect(() => {
     if (!profile) {
@@ -58,6 +62,7 @@ function TrainingProfile() {
       goalRaceDistanceKm: String(profile.goalRaceDistanceKm ?? 10),
       trainingGoals: profile.trainingGoals?.length ? profile.trainingGoals : ['consistency']
     });
+    setPaceFields(paceFieldsFromDecimal(profile.goalPaceMinPerKm ?? 6));
   }, [profile]);
 
   const toggleGoal = (goal) => {
@@ -77,11 +82,12 @@ function TrainingProfile() {
     setStatus('');
 
     try {
+      const goalPace = minSecToDecimalPace(paceFields.minutes, paceFields.seconds);
       await authApi.updatePreferences({
         age: form.age ? Number(form.age) : undefined,
         experience: form.experience,
         preferredDistance: Number(form.preferredDistance),
-        goalPaceMinPerKm: Number(form.goalPaceMinPerKm),
+        goalPaceMinPerKm: goalPace ?? Number(form.goalPaceMinPerKm),
         weeklyTrainingLoadKm: Number(form.weeklyTrainingLoadKm),
         goalRaceName: form.goalRaceName,
         goalRaceDate: form.goalRaceDate || null,
@@ -110,20 +116,6 @@ function TrainingProfile() {
 
   return (
     <Box component="main">
-      <Card variant="outlined" sx={{ mb: 3 }}>
-        <CardContent>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
-            <TargetIcon size={22} />
-            <Typography variant="h4" component="h1" fontWeight={700}>
-              Training profile
-            </Typography>
-          </Stack>
-          <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 640 }}>
-            Personalize weekly load, goal pace, and race targets so your training review stays tuned to you.
-          </Typography>
-        </CardContent>
-      </Card>
-
       {status && (
         <Alert severity={status.includes('Unable') ? 'error' : 'success'} sx={{ mb: 2 }}>
           {status}
@@ -136,14 +128,13 @@ function TrainingProfile() {
             <Typography variant="h6" fontWeight={600}>
               Goals & load
             </Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
-                fullWidth
-                label="Goal pace (min/km)"
-                onChange={(e) => setForm({ ...form, goalPaceMinPerKm: e.target.value })}
-                type="number"
-                inputProps={{ min: 2.5, step: 0.1 }}
-                value={form.goalPaceMinPerKm}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }}>
+              <PaceInput
+                label="Goal pace"
+                minutes={paceFields.minutes}
+                seconds={paceFields.seconds}
+                onChange={setPaceFields}
+                helperText="Used to personalize race projections and weekly reviews."
               />
               <TextField
                 fullWidth
@@ -152,6 +143,11 @@ function TrainingProfile() {
                 type="number"
                 inputProps={{ min: 5, step: 1 }}
                 value={form.weeklyTrainingLoadKm}
+                helperText={
+                  profile?.weeklyTrainingLoadKm
+                    ? `Target: ${formatMetric(profile.weeklyTrainingLoadKm, 'km')}`
+                    : undefined
+                }
               />
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -201,6 +197,15 @@ function TrainingProfile() {
                 value={form.goalRaceDistanceKm}
               />
             </Stack>
+            {form.goalRaceDate ? (
+              <Chip
+                size="small"
+                variant="outlined"
+                color="secondary"
+                label={getRaceCountdown(form.goalRaceDate)?.label || 'Set a valid race date'}
+                sx={{ alignSelf: 'flex-start' }}
+              />
+            ) : null}
 
             <Typography variant="subtitle2" color="text.secondary">
               Training focus

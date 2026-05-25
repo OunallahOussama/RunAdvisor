@@ -9,6 +9,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { activitiesApi } from '../services/api';
+import { formatNumber, formatPaceLabel, formatPercent } from '../utils/format';
 import { TrendIcon } from './icons';
 
 function SimilarityRow({ label, name, date, similarity, to }) {
@@ -40,7 +41,7 @@ function SimilarityRow({ label, name, date, similarity, to }) {
             {dateLabel ? ` · ${dateLabel}` : ''}
           </Typography>
         </Box>
-        <Chip color="primary" label={`${(similarity * 100).toFixed(0)}%`} size="small" variant="outlined" />
+        <Chip color="primary" label={formatPercent(similarity * 100)} size="small" variant="outlined" />
       </Stack>
     </Box>
   );
@@ -150,7 +151,7 @@ function SimilarRunsPanel({ activityId }) {
               <SimilarityRow
                 key={run.activityId}
                 date={run.date}
-                label={`${run.distanceKm} km · ${run.pace ? `${run.pace} min/km` : 'pace n/a'}`}
+                label={`${formatNumber(run.distanceKm)} km · ${run.pace ? formatPaceLabel(run.pace) : 'pace n/a'}`}
                 name={run.name}
                 similarity={run.similarity}
                 to={`/activities/${run.activityId}`}

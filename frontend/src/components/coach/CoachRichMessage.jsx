@@ -124,7 +124,7 @@ function MetricsRichCard({ data }) {
     {
       label: 'Distance',
       value: `${formatNumber(keyMetrics.totalDistanceKm)} km`,
-      sublabel: `${formatNumber(keyMetrics.runsPerWeek, { digits: 1 })} runs/wk`
+      sublabel: `${formatNumber(keyMetrics.runsPerWeek)} runs/wk`
     },
     {
       label: 'ACWR',
@@ -208,7 +208,7 @@ function WeeklyPlanRichCard({ data }) {
                 {day.title}
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                {[day.durationMinutes ? `${day.durationMinutes} min` : null, day.distanceKm != null ? `${day.distanceKm} km` : null, day.rpe ? `RPE ${day.rpe}` : null]
+                {[day.durationMinutes ? `${day.durationMinutes} min` : null, day.distanceKm != null ? `${formatNumber(day.distanceKm)} km` : null, day.rpe ? `RPE ${day.rpe}` : null]
                   .filter(Boolean)
                   .join(' · ')}
               </Typography>

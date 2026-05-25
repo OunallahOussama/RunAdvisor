@@ -45,7 +45,7 @@ export function formatWorkoutText(day, { nextSessionDetail, scheduledDate } = {}
     lines.push(`Duration: ${day.durationMinutes} min`);
   }
   if (day?.distanceKm) {
-    lines.push(`Distance: ${formatNumber(day.distanceKm, { digits: 1, suffix: ' km' })}`);
+    lines.push(`Distance: ${formatNumber(day.distanceKm, { suffix: ' km' })}`);
   }
   if (day?.targetPace?.label) {
     lines.push(`Target pace: ${day.targetPace.label}`);

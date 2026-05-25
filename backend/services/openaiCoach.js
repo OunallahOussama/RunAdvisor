@@ -49,7 +49,7 @@ function buildFallbackWeeklySummary({ user = {}, activities = [], progress = {},
   return {
     source: 'rules',
     headline,
-    summary: `You logged ${count} run(s) (~${distanceKm.toFixed(1)} km). ${headline} Next focus: ${focus}`,
+    summary: `You logged ${count} run(s) (~${distanceKm.toFixed(2)} km). ${headline} Next focus: ${focus}`,
     bullets: [
       progress?.loadProgressPct != null
         ? `Weekly load: ${progress.loadProgressPct}% of your ${progress.weeklyLoadTargetKm} km target.`

@@ -204,7 +204,7 @@ function WeeklyPlanDayCard({
           <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 0.25 }}>
             <Typography variant="caption" color="text.secondary">
               {day?.durationMinutes ? `${day.durationMinutes} min` : '—'}
-              {day?.distanceKm ? ` · ${formatNumber(day.distanceKm, { digits: 1, suffix: ' km' })}` : ''}
+              {day?.distanceKm ? ` · ${formatNumber(day.distanceKm, { suffix: ' km' })}` : ''}
             </Typography>
             {day?.rpe ? (
               <Chip size="small" color="warning" label={`RPE ${day.rpe}`} sx={{ height: 20, '& .MuiChip-label': { px: 0.75, fontSize: 10 } }} />
@@ -261,7 +261,7 @@ function WeeklyPlanDayCard({
                   <Chip size="small" variant="outlined" label={`${day.durationMinutes} min`} />
                 ) : null}
                 {day?.distanceKm ? (
-                  <Chip size="small" variant="outlined" label={formatNumber(day.distanceKm, { digits: 1, suffix: ' km' })} />
+                  <Chip size="small" variant="outlined" label={formatNumber(day.distanceKm, { suffix: ' km' })} />
                 ) : null}
                 {day?.rpe ? <Chip size="small" color="warning" label={`RPE ${day.rpe}`} /> : null}
               </Stack>
@@ -309,7 +309,7 @@ function WeeklyPlanDayCard({
                 <Chip size="small" variant="outlined" label={`${day.durationMinutes} min`} />
               ) : null}
               {day?.distanceKm ? (
-                <Chip size="small" variant="outlined" label={formatNumber(day.distanceKm, { digits: 1, suffix: ' km' })} />
+                <Chip size="small" variant="outlined" label={formatNumber(day.distanceKm, { suffix: ' km' })} />
               ) : null}
               {day?.rpe ? <Chip size="small" color="warning" label={`RPE ${day.rpe}`} /> : null}
               {day?.hrZone ? <Chip size="small" variant="outlined" label={day.hrZone} /> : null}

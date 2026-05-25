@@ -34,6 +34,7 @@ import {
 } from '../components/icons';
 import { activitiesApi, stravaApi } from '../services/api';
 import { getVisibilityChipColor, getVisibilityLabel } from '../utils/activityVisibility';
+import { formatNumber, formatPaceLabel } from '../utils/format';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -96,7 +97,7 @@ function SplitsElevationChart({ splits }) {
       const delta = Number(split.elevation_difference || 0);
       cumulative += delta;
       labels.push(`Km ${index + 1}`);
-      data.push(Number(cumulative.toFixed(1)));
+      data.push(Number(cumulative.toFixed(2)));
     });
 
     return {
@@ -374,14 +375,14 @@ function ActivityDetail() {
                   gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(3, 1fr)' }
                 }}
               >
-                <MetricTile icon={DistanceIcon} label="Distance" value={`${(Number(distanceM) / 1000).toFixed(2)} km`} />
+                <MetricTile icon={DistanceIcon} label="Distance" value={`${formatNumber(Number(distanceM) / 1000)} km`} />
                 <MetricTile icon={ClockIcon} label="Moving time" value={formatDuration(moving)} />
                 <MetricTile icon={ClockIcon} label="Elapsed" value={formatDuration(elapsed)} />
                 <MetricTile icon={ElevationIcon} label="Elevation gain" value={`${Math.round(Number(elev))} m`} />
                 <MetricTile
                   icon={PaceIcon}
                   label="Pace (saved)"
-                  value={paceMinPerKm != null ? `${Number(paceMinPerKm).toFixed(1)} min/km` : 'N/A'}
+                  value={paceMinPerKm != null ? formatPaceLabel(paceMinPerKm) : 'N/A'}
                 />
                 {avgHr != null && <MetricTile icon={HeartIcon} label="Avg HR" value={`${Math.round(avgHr)} bpm`} />}
                 {maxHr != null && <MetricTile icon={HeartIcon} label="Max HR" value={`${Math.round(maxHr)} bpm`} />}
