@@ -22,6 +22,7 @@ import { useTheme as useMuiTheme } from '@mui/material/styles';
 import HomeIcon from '@mui/icons-material/Home';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import PeopleIcon from '@mui/icons-material/People';
 import PersonIcon from '@mui/icons-material/Person';
 import LogoutIcon from '@mui/icons-material/Logout';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
@@ -38,6 +39,7 @@ import { RunAdvisorMark } from '../icons';
 const NAV_ITEMS = [
   { value: '/', label: 'Home', Icon: HomeIcon, match: (p) => p === '/' || p === '/recommendations' },
   { value: '/activities', label: 'Activities', Icon: DirectionsRunIcon, match: (p) => p.startsWith('/activities') },
+  { value: '/community', label: 'Community', Icon: PeopleIcon, match: (p) => p.startsWith('/community') },
   { value: '/training-report', label: 'Stats', Icon: AssessmentIcon, match: (p) => p.startsWith('/training-report') },
   { value: '/profile', label: 'Profile', Icon: PersonIcon, match: (p) => p.startsWith('/profile') }
 ];

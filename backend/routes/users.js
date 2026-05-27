@@ -17,6 +17,7 @@ function serializeConsent(user) {
       recommendations: consent.notifications?.recommendations !== false,
       weeklyReport: consent.notifications?.weeklyReport !== false
     },
+    stravaActivityInsights: consent.stravaActivityInsights !== false,
     consentVersion: consent.consentVersion || null,
     consentAcceptedAt: consent.consentAcceptedAt || null
   };
@@ -54,6 +55,7 @@ router.get('/me/consent', auth, async (req, res) => {
  * Body (partial allowed):
  *   shareAnonymizedTraining, marketingEmails,
  *   notifications: { browser, recommendations, weeklyReport },
+ *   stravaActivityInsights: boolean (write TL;DR to latest Strava activity),
  *   acceptVersion: string  (sets consentAcceptedAt + consentVersion)
  */
 router.put('/me/consent', auth, async (req, res) => {
@@ -71,6 +73,9 @@ router.put('/me/consent', auth, async (req, res) => {
     }
     if (typeof body.marketingEmails === 'boolean') {
       user.consent.marketingEmails = body.marketingEmails;
+    }
+    if (typeof body.stravaActivityInsights === 'boolean') {
+      user.consent.stravaActivityInsights = body.stravaActivityInsights;
     }
 
     if (body.notifications && typeof body.notifications === 'object') {

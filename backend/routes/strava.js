@@ -11,6 +11,10 @@ const {
   stravaAxios
 } = require('../utils/stravaCredentials');
 const { createNotification } = require('../services/notificationService');
+const {
+  scheduleStravaInsightPush,
+  pickLatestSyncedActivity
+} = require('../services/stravaActivityInsightPush');
 
 const router = express.Router();
 const MAX_TRAINING_PLAN_BYTES = 2 * 1024 * 1024;
@@ -161,7 +165,9 @@ async function findOwnedActivityForStravaDetail(userId, identifier) {
   return Activity.findOne({ userId: uid, stravaActivityId: id });
 }
 
-function scheduleBackgroundStravaSync(userId, limit = 20) {
+const STRAVA_SYNC_LIMIT = 24;
+
+function scheduleBackgroundStravaSync(userId, limit = STRAVA_SYNC_LIMIT) {
   const syncKey = String(userId);
 
   if (backgroundSyncs.has(syncKey)) {
@@ -327,6 +333,12 @@ async function syncRecentActivitiesForUser(userId, user, accessToken, limit = 20
     console.error('Strava sync notification failed:', notifyError.message || notifyError);
   }
 
+  const latestActivity = pickLatestSyncedActivity(savedActivities);
+
+  if (latestActivity) {
+    scheduleStravaInsightPush(userId, latestActivity);
+  }
+
   return {
     syncedCount: savedActivities.length,
     skippedCount: Math.max(0, rawActivities.length - savedActivities.length),
@@ -377,7 +389,7 @@ router.post('/authenticate', auth, validateStravaAuthenticate, async (req, res) 
       expiresAt: new Date(expires_at * 1000)
     });
 
-    scheduleBackgroundStravaSync(userId, 20);
+    scheduleBackgroundStravaSync(userId, STRAVA_SYNC_LIMIT);
 
     res.json({
       success: true,

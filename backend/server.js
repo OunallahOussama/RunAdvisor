@@ -61,6 +61,7 @@ app.use('/api/coach/chat', require('./routes/coachChat'));
 app.use('/api/coach', require('./routes/coach'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/strava', stravaLimiter, require('./routes/strava'));
+app.use('/api/social', require('./routes/social'));
 
 // Health checks
 app.use('/health', require('./routes/health'));

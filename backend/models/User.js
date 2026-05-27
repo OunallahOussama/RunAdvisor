@@ -11,6 +11,8 @@ const consentSchema = new mongoose.Schema({
     recommendations: { type: Boolean, default: true },
     weeklyReport: { type: Boolean, default: true }
   },
+  /** When false, skip async Strava description insight write-back (activity:write). */
+  stravaActivityInsights: { type: Boolean, default: true },
   consentVersion: { type: String, default: null },
   consentAcceptedAt: { type: Date, default: null }
 }, { _id: false });
@@ -101,6 +103,10 @@ const userSchema = new mongoose.Schema({
     default: null
   },
   consent: { type: consentSchema, default: () => ({}) },
+
+  /** Community: show in user search when true (default on). */
+  discoverable: { type: Boolean, default: true },
+  socialBio: { type: String, trim: true, maxlength: 280, default: '' },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

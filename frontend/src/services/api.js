@@ -184,7 +184,11 @@ export const coachApi = {
 export const COACH_NOTIFICATION_TYPES = [
   'coach_nudge',
   'coach_session_ready',
-  'weekly_report_ready'
+  'weekly_report_ready',
+  'friend_request',
+  'friend_accepted',
+  'social_message',
+  'social_follow'
 ];
 
 export const coachChatApi = {
@@ -216,6 +220,26 @@ export const notificationsApi = {
     api.get('/notifications', { params: { unread: unread ? 'true' : undefined, limit } }),
   markRead: (id) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all')
+};
+
+export const socialApi = {
+  searchUsers: (q) => api.get('/social/users/search', { params: { q } }),
+  getMembers: () => api.get('/social/members'),
+  getIncomingFriendRequests: () => api.get('/social/friends/requests/incoming'),
+  getFriends: () => api.get('/social/friends'),
+  getFollowing: () => api.get('/social/following'),
+  getFollowers: () => api.get('/social/followers'),
+  getFeed: () => api.get('/social/feed'),
+  follow: (userId) => api.post(`/social/follow/${userId}`),
+  unfollow: (userId) => api.delete(`/social/follow/${userId}`),
+  sendFriendRequest: (userId) => api.post(`/social/friends/request/${userId}`),
+  acceptFriendRequest: (requestId) => api.post(`/social/friends/requests/${requestId}/accept`),
+  rejectFriendRequest: (requestId) => api.post(`/social/friends/requests/${requestId}/reject`),
+  getConversations: () => api.get('/social/messages'),
+  getThread: (userId) => api.get(`/social/messages/${userId}`),
+  sendMessage: (userId, body) => api.post(`/social/messages/${userId}`, { body }),
+  getActivityShare: (activityId, origin) =>
+    api.get(`/social/activities/${activityId}/share`, { params: { origin } })
 };
 
 export default api;

@@ -22,6 +22,7 @@ import { Line } from 'react-chartjs-2';
 import ActivityRouteMap from '../components/ActivityRouteMap';
 import DeleteActivityDialog from '../components/DeleteActivityDialog';
 import SimilarRunsPanel from '../components/SimilarRunsPanel';
+import ShareButton from '../components/ShareButton';
 import ActivityStreamsChart from '../components/ActivityStreamsChart';
 import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 import {
@@ -347,7 +348,8 @@ function ActivityDetail() {
                     {detail?.timezone ? ` • ${detail.timezone}` : ''}
                   </Typography>
                 </Box>
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                  <ShareButton activityId={localActivity._id} variant="button" />
                   {displayType && <Chip size="small" label={String(displayType)} variant="outlined" />}
                   {localActivity?.visibility && (
                     <Chip

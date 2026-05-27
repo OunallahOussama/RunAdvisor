@@ -9,6 +9,9 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import { Link as RouterLink } from 'react-router-dom';
 import { authApi } from '../services/api';
 import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
 import {
@@ -35,7 +38,9 @@ function TrainingProfile() {
     goalRaceName: '',
     goalRaceDate: '',
     goalRaceDistanceKm: '10',
-    trainingGoals: ['consistency']
+    trainingGoals: ['consistency'],
+    discoverable: true,
+    socialBio: ''
   });
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
@@ -60,7 +65,9 @@ function TrainingProfile() {
         ? new Date(profile.goalRaceDate).toISOString().split('T')[0]
         : '',
       goalRaceDistanceKm: String(profile.goalRaceDistanceKm ?? 10),
-      trainingGoals: profile.trainingGoals?.length ? profile.trainingGoals : ['consistency']
+      trainingGoals: profile.trainingGoals?.length ? profile.trainingGoals : ['consistency'],
+      discoverable: profile.discoverable !== false,
+      socialBio: profile.socialBio || ''
     });
     setPaceFields(paceFieldsFromDecimal(profile.goalPaceMinPerKm ?? 6));
   }, [profile]);
@@ -92,7 +99,9 @@ function TrainingProfile() {
         goalRaceName: form.goalRaceName,
         goalRaceDate: form.goalRaceDate || null,
         goalRaceDistanceKm: Number(form.goalRaceDistanceKm),
-        trainingGoals: form.trainingGoals
+        trainingGoals: form.trainingGoals,
+        discoverable: form.discoverable,
+        socialBio: form.socialBio
       });
       await refreshProfile();
       setStatus('Profile saved. Training insights will use your goals and load targets.');
@@ -230,6 +239,31 @@ function TrainingProfile() {
               type="number"
               value={form.age}
             />
+
+            <Typography variant="h6" fontWeight={600}>
+              Community
+            </Typography>
+            <TextField
+              fullWidth
+              label="Short bio"
+              placeholder="e.g. Training for my first half marathon"
+              value={form.socialBio}
+              onChange={(e) => setForm({ ...form, socialBio: e.target.value })}
+              inputProps={{ maxLength: 280 }}
+              helperText="Shown when others find you in Community."
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={form.discoverable}
+                  onChange={(e) => setForm({ ...form, discoverable: e.target.checked })}
+                />
+              }
+              label="Let other RunAdvisor members find and add me as a friend"
+            />
+            <Button component={RouterLink} to="/community" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>
+              Open Community
+            </Button>
 
             {isNotificationSupported() && (
               <Box sx={{ pt: 1 }}>

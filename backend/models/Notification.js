@@ -8,6 +8,10 @@ const NOTIFICATION_TYPES = [
   'coach_nudge',
   'consent_reminder',
   'session_today',
+  'social_follow',
+  'friend_request',
+  'friend_accepted',
+  'social_message',
   'system'
 ];
 

@@ -198,7 +198,7 @@ function validateSyncRecent(req, res, next) {
   const rawLimit = req.body?.limit ?? req.query?.limit;
 
   if (rawLimit == null || rawLimit === '') {
-    req.syncLimit = 20;
+    req.syncLimit = STRAVA_SYNC_LIMIT;
     return next();
   }
 

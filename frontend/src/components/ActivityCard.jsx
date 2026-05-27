@@ -11,6 +11,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ActivityStatStrip from './ActivityStatStrip';
+import ShareButton from './ShareButton';
 import { ActivityIcon, TrailIcon } from './icons';
 import { formatNumber, formatPaceLabel, formatDurationShort, formatRelativeTime } from '../utils/format';
 
@@ -85,7 +86,8 @@ function ActivityCard({ activity, onDelete }) {
       <CardContent sx={{ pt: 0, pb: 1.5 }}>
         <ActivityStatStrip stats={statStrip} />
 
-        <Stack direction="row" justifyContent="flex-end" sx={{ mt: 1 }}>
+        <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={0.5} sx={{ mt: 1 }}>
+          <ShareButton activityId={activity._id} />
           <IconButton
             size="small"
             aria-label="Activity actions"

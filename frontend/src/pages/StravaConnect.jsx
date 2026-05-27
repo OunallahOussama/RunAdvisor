@@ -191,8 +191,8 @@ function StravaConnect() {
   const handleManualSync = async () => {
     try {
       setSyncing(true);
-      setStatus('Syncing your recent Strava activities...');
-      const response = await stravaApi.syncRecentActivities(20);
+      setStatus('Syncing your last 24 Strava activities…');
+      const response = await stravaApi.syncRecentActivities(24);
       const syncedCount = response?.data?.syncedCount || 0;
       await loadPageData();
       setStatus(`Synced ${syncedCount} recent Strava activities. Open Training review to see refreshed insights.`);
@@ -355,7 +355,7 @@ function StravaConnect() {
                   startIcon={<SyncIcon size={16} />}
                   variant="outlined"
                 >
-                  {syncing ? 'Syncing...' : 'Sync recent activities'}
+                  {syncing ? 'Syncing…' : 'Sync last 24 activities'}
                 </Button>
               )}
               <Button onClick={() => navigate('/recommendations')} startIcon={<CoachIcon size={16} />} variant="outlined">

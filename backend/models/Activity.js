@@ -109,6 +109,8 @@ const activitySchema = new mongoose.Schema({
   
   notes: String,
 
+  stravaInsightPushedAt: Date,
+
   // Strava-aligned: everyone (public), followers_only, only_me (private)
   visibility: {
     type: String,

@@ -33,7 +33,7 @@ export function useTrainingSync({ enabled, stravaConnected, onSynced }) {
     syncingRef.current = true;
 
     try {
-      const response = await stravaApi.syncRecentActivities(20);
+      const response = await stravaApi.syncRecentActivities(24);
       markAutoSync();
       const count = response.data?.synced ?? response.data?.count ?? 0;
 

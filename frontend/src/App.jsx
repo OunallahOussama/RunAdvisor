@@ -16,6 +16,7 @@ import Recommendations from './pages/Recommendations';
 import TrainingReport from './pages/TrainingReport';
 import StravaConnect from './pages/StravaConnect';
 import StravaCallback from './pages/StravaCallback';
+import Community from './pages/Community';
 import TrainingProfile from './pages/TrainingProfile';
 import AdminDashboard from './pages/AdminDashboard';
 import About from './pages/legal/About';
@@ -75,6 +76,7 @@ function AuthenticatedRoutes() {
       <Route path="/activities" element={<Activities />} />
       <Route path="/training-report" element={<TrainingReport />} />
       <Route path="/strava-connect" element={<StravaConnect />} />
+      <Route path="/community" element={<Community />} />
       <Route path="/profile" element={<TrainingProfile />} />
       <Route path="/admin" element={<AdminDashboard />} />
       <Route path="/about" element={<About />} />

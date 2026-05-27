@@ -55,6 +55,8 @@ function serializeUser(user) {
     goalRaceName: user.goalRaceName,
     goalRaceDate: user.goalRaceDate,
     goalRaceDistanceKm: user.goalRaceDistanceKm,
+    discoverable: user.discoverable !== false,
+    socialBio: user.socialBio || '',
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -193,7 +195,9 @@ router.put('/preferences', auth, async (req, res) => {
       weeklyTrainingLoadKm,
       goalRaceName,
       goalRaceDate,
-      goalRaceDistanceKm
+      goalRaceDistanceKm,
+      discoverable,
+      socialBio
     } = req.body;
 
     const update = { updatedAt: new Date() };
@@ -207,6 +211,8 @@ router.put('/preferences', auth, async (req, res) => {
     if (goalRaceName != null) update.goalRaceName = String(goalRaceName).trim();
     if (goalRaceDate != null) update.goalRaceDate = goalRaceDate ? new Date(goalRaceDate) : null;
     if (goalRaceDistanceKm != null) update.goalRaceDistanceKm = Number(goalRaceDistanceKm);
+    if (typeof discoverable === 'boolean') update.discoverable = discoverable;
+    if (socialBio != null) update.socialBio = String(socialBio).trim().slice(0, 280);
 
     const user = await User.findByIdAndUpdate(req.userId, update, { new: true });
     user.preferenceVector = buildUserPreferenceVector(user);
