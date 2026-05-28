@@ -250,7 +250,7 @@ function TrainingProfile() {
               value={form.socialBio}
               onChange={(e) => setForm({ ...form, socialBio: e.target.value })}
               inputProps={{ maxLength: 280 }}
-              helperText="Shown when others find you in Community."
+              helperText="Shown when others find you via the search icon in the top bar."
             />
             <FormControlLabel
               control={
@@ -261,6 +261,9 @@ function TrainingProfile() {
               }
               label="Let other RunAdvisor members find and add me as a friend"
             />
+            <Typography variant="body2" color="text.secondary">
+              Others can find you with the search icon (top right), like Strava athlete search.
+            </Typography>
             <Button component={RouterLink} to="/community" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>
               Open Community
             </Button>

@@ -92,11 +92,14 @@ function AdminDashboard() {
     email: null,
     auth0UserId: null
   });
+  const [section, setSection] = useState(0);
   const [days, setDays] = useState(7);
   const [overview, setOverview] = useState(null);
   const [insights, setInsights] = useState(null);
   const [usage, setUsage] = useState([]);
+  const [userDirectory, setUserDirectory] = useState(null);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   const [error, setError] = useState('');
   const [lastRefresh, setLastRefresh] = useState(null);
 
@@ -163,11 +166,32 @@ function AdminDashboard() {
     };
   }, []);
 
+  const loadUsers = useCallback(async (windowDays) => {
+    setLoadingUsers(true);
+    setError('');
+
+    try {
+      const res = await adminApi.getUsers(windowDays, 300);
+      setUserDirectory(res.data);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to load user directory.');
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (access.isAdmin) {
+    if (access.isAdmin && section === 0) {
       loadMetrics(days);
     }
-  }, [access.isAdmin, days, loadMetrics]);
+  }, [access.isAdmin, section, days, loadMetrics]);
+
+  useEffect(() => {
+    if (access.isAdmin && section === 1) {
+      loadUsers(days);
+    }
+  }, [access.isAdmin, section, days, loadUsers]);
 
   const activity = overview?.activity || {};
   const totals = overview?.totals || {};
@@ -181,8 +205,35 @@ function AdminDashboard() {
   );
 
   const handleRefresh = () => {
-    if (access.isAdmin) {
+    if (!access.isAdmin) {
+      return;
+    }
+    if (section === 0) {
       loadMetrics(days);
+    } else {
+      loadUsers(days);
+    }
+  };
+
+  const formatTs = (value) => {
+    if (!value) {
+      return '—';
+    }
+    try {
+      return format(parseISO(value), 'MMM d, yyyy HH:mm');
+    } catch {
+      return '—';
+    }
+  };
+
+  const formatRelative = (value) => {
+    if (!value) {
+      return '';
+    }
+    try {
+      return formatDistanceToNow(parseISO(value), { addSuffix: true });
+    } catch {
+      return '';
     }
   };
 
@@ -239,11 +290,21 @@ function AdminDashboard() {
             {access.email && <Chip label={access.email} size="small" variant="outlined" />}
           </Stack>
           <Typography variant="h4" fontWeight={700} gutterBottom>
-            Admin · Metrics & usage
+            Admin
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720 }}>
-            Application health, API traffic, feature adoption, and error signals for RunAdvisor.
+            {section === 0
+              ? 'Application health, API traffic, feature adoption, and error signals.'
+              : 'All users with last login, last activity, and usage in the selected window.'}
           </Typography>
+          <Tabs
+            value={section}
+            onChange={(_e, value) => setSection(value)}
+            sx={{ mt: 2, minHeight: 40, '& .MuiTab-root': { minHeight: 40, py: 0.5 } }}
+          >
+            <Tab label="Metrics & usage" />
+            <Tab label="All users" />
+          </Tabs>
           {lastRefresh && (
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
               Updated {formatDistanceToNow(lastRefresh, { addSuffix: true })}
@@ -263,7 +324,11 @@ function AdminDashboard() {
           </Tabs>
           <Tooltip title="Refresh metrics">
             <span>
-              <IconButton onClick={handleRefresh} disabled={loadingMetrics} aria-label="Refresh metrics">
+              <IconButton
+                onClick={handleRefresh}
+                disabled={section === 0 ? loadingMetrics : loadingUsers}
+                aria-label="Refresh"
+              >
                 <RefreshIcon />
               </IconButton>
             </span>
@@ -271,10 +336,98 @@ function AdminDashboard() {
         </Stack>
       </Stack>
 
-      {loadingMetrics && <LinearProgress sx={{ mb: 2 }} />}
+      {(section === 0 ? loadingMetrics : loadingUsers) && <LinearProgress sx={{ mb: 2 }} />}
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-      {overview && (
+      {section === 1 && userDirectory && (
+        <Card variant="outlined">
+          <CardContent>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+              <Typography variant="h6" fontWeight={600}>
+                Users ({userDirectory.listed} shown · {userDirectory.totalUsers} total)
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Usage & activities in last {userDirectory.windowDays}d
+              </Typography>
+            </Stack>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>User</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Last login</TableCell>
+                    <TableCell>Last active</TableCell>
+                    <TableCell align="right">Activities</TableCell>
+                    <TableCell align="right">API ({userDirectory.windowDays}d)</TableCell>
+                    <TableCell>Last API</TableCell>
+                    <TableCell>Joined</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(userDirectory.users || []).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={8}>
+                        <Typography variant="body2" color="text.secondary">
+                          No users yet.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {(userDirectory.users || []).map((user) => (
+                    <TableRow key={user.id} hover>
+                      <TableCell>
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Typography variant="body2" fontWeight={600}>
+                            {user.name}
+                          </Typography>
+                          {user.stravaConnected && (
+                            <Chip label="Strava" size="small" variant="outlined" />
+                          )}
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 200, wordBreak: 'break-all' }}>
+                        {user.email || '—'}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography variant="body2">{formatTs(user.lastLoginAt)}</Typography>
+                        {user.lastLoginAt && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {formatRelative(user.lastLoginAt)}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        <Typography variant="body2">{formatTs(user.lastActiveAt)}</Typography>
+                        {user.lastActiveAt && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {formatRelative(user.lastActiveAt)}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {user.totalActivities}
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          +{user.recentActivities} in window
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">{user.requestsWindow}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {formatTs(user.lastRequestAt)}
+                      </TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                        {formatTs(user.createdAt)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          </CardContent>
+        </Card>
+      )}
+
+      {section === 0 && overview && (
         <>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} sm={6} md={3}>
@@ -508,6 +661,12 @@ function AdminDashboard() {
             </CardContent>
           </Card>
         </>
+      )}
+
+      {section === 1 && !userDirectory && !loadingUsers && (
+        <Typography variant="body2" color="text.secondary">
+          No user data loaded yet.
+        </Typography>
       )}
     </Box>
   );

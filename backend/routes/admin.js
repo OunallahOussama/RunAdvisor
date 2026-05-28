@@ -4,7 +4,11 @@ const auth = require('../middleware/auth');
 const admin = require('../middleware/admin');
 const { isAdminUser } = require('../utils/adminAccess');
 const { getClaimEmail } = require('../utils/authClaims');
-const { buildAdminOverview, buildApplicationInsights } = require('../services/usageAnalytics');
+const {
+  buildAdminOverview,
+  buildApplicationInsights,
+  buildAdminUsersDirectory
+} = require('../services/usageAnalytics');
 const UsageEvent = require('../models/UsageEvent');
 
 const router = express.Router();
@@ -68,6 +72,18 @@ router.get('/insights', async (req, res) => {
   } catch (error) {
     console.error('Admin insights error:', error);
     res.status(500).json({ error: 'Failed to load application insights' });
+  }
+});
+
+router.get('/users', async (req, res) => {
+  try {
+    const days = Math.min(parseInt(req.query.days, 10) || 30, 90);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
+    const directory = await buildAdminUsersDirectory(days, limit);
+    res.json({ success: true, ...directory });
+  } catch (error) {
+    console.error('Admin users error:', error);
+    res.status(500).json({ error: 'Failed to load users directory' });
   }
 });
 

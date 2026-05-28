@@ -32,6 +32,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import StravaStatusIndicator from '../StravaStatusIndicator';
 import ThemeToggleButton from '../ThemeToggleButton';
 import NotificationBell from './NotificationBell';
+import MemberSearchButton from './MemberSearchButton';
 import CoachChatWidget from '../coach/CoachChatWidget';
 import { useAppShell } from '../../context/AppShellContext';
 import { RunAdvisorMark } from '../icons';
@@ -194,6 +195,7 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
           </Typography>
           <Stack direction="row" alignItems="center" spacing={0.5}>
             {!isMobile ? <StravaStatusIndicator compact /> : null}
+            {user ? <MemberSearchButton /> : null}
             <ThemeToggleButton />
             <NotificationBell enabled={Boolean(user)} consent={consent} />
             <ProfileMenu user={user} onLogout={onLogout} onReplayTour={onReplayTour} />

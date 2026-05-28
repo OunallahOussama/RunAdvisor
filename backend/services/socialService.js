@@ -34,8 +34,10 @@ function serializePublicUser(user, extras = {}) {
 async function searchDiscoverableUsers(viewerId, query, limit = 20) {
   const q = String(query || '').trim();
 
-  if (q.length < 2) {
-    return [];
+  if (q.length < 3) {
+    const err = new Error('Enter at least 3 characters to search.');
+    err.status = 400;
+    throw err;
   }
 
   const viewerOid = toObjectId(viewerId);
@@ -78,23 +80,6 @@ async function enrichUsersForViewer(viewerId, users) {
       outgoingRequestId: friendMap.get(String(user._id))?.outgoingRequestId || null
     })
   );
-}
-
-async function listDiscoverableMembers(viewerId, limit = 12) {
-  const viewerOid = toObjectId(viewerId);
-  const users = await User.find({
-    _id: { $ne: viewerOid },
-    discoverable: { $ne: false },
-    $and: [
-      { $or: [{ auth0UserId: { $exists: true, $ne: null } }, { email: { $ne: null, $exists: true } }] }
-    ]
-  })
-    .sort({ updatedAt: -1 })
-    .limit(Math.min(limit, 30))
-    .select('name picture socialBio runningGoal')
-    .lean();
-
-  return enrichUsersForViewer(viewerId, users);
 }
 
 async function listIncomingFriendRequests(userId) {
@@ -547,7 +532,6 @@ function buildActivitySharePayload(activity, baseUrl) {
 
 module.exports = {
   searchDiscoverableUsers,
-  listDiscoverableMembers,
   listIncomingFriendRequests,
   followUser,
   unfollowUser,

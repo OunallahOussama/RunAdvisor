@@ -7,7 +7,6 @@ const {
 } = require('../utils/stravaCredentials');
 const {
   searchDiscoverableUsers,
-  listDiscoverableMembers,
   listIncomingFriendRequests,
   followUser,
   unfollowUser,
@@ -30,19 +29,10 @@ router.get('/users/search', auth, async (req, res) => {
     const users = await searchDiscoverableUsers(req.userId, req.query.q, 20);
     res.json({ success: true, users });
   } catch (error) {
-    res.status(error.status || 500).json({
+    res.status(error.status || 400).json({
       error: 'Search failed',
       message: error.message || 'Could not search users.'
     });
-  }
-});
-
-router.get('/members', auth, async (req, res) => {
-  try {
-    const members = await listDiscoverableMembers(req.userId, 15);
-    res.json({ success: true, members });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to load members' });
   }
 });
 

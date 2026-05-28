@@ -183,9 +183,88 @@ async function buildApplicationInsights(days = 7) {
   };
 }
 
+async function buildAdminUsersDirectory(days = 30, limit = 200) {
+  const windowDays = Math.min(Math.max(Number(days) || 30, 1), 90);
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
+  const cap = Math.min(Math.max(Number(limit) || 200, 1), 500);
+
+  const [totalUsers, users] = await Promise.all([
+    User.countDocuments(),
+    User.find({})
+      .sort({ lastActiveAt: -1, lastLoginAt: -1, updatedAt: -1 })
+      .limit(cap)
+      .select(
+        'name email picture role stravaId discoverable createdAt updatedAt lastLoginAt lastActiveAt'
+      )
+      .lean()
+  ]);
+
+  const userIds = users.map((u) => u._id);
+
+  const [activityStats, usageStats] = await Promise.all([
+    Activity.aggregate([
+      { $match: { userId: { $in: userIds } } },
+      {
+        $group: {
+          _id: '$userId',
+          totalActivities: { $sum: 1 },
+          recentActivities: {
+            $sum: { $cond: [{ $gte: ['$createdAt', since] }, 1, 0] }
+          }
+        }
+      }
+    ]),
+    UsageEvent.aggregate([
+      { $match: { userId: { $in: userIds }, createdAt: { $gte: since } } },
+      {
+        $group: {
+          _id: '$userId',
+          requests: { $sum: 1 },
+          lastRequestAt: { $max: '$createdAt' }
+        }
+      }
+    ])
+  ]);
+
+  const activityByUser = new Map(activityStats.map((row) => [String(row._id), row]));
+  const usageByUser = new Map(usageStats.map((row) => [String(row._id), row]));
+
+  const directory = users.map((user) => {
+    const id = String(user._id);
+    const activity = activityByUser.get(id);
+    const usage = usageByUser.get(id);
+
+    return {
+      id,
+      name: user.name || 'Runner',
+      email: user.email || null,
+      picture: user.picture || null,
+      role: user.role || 'user',
+      stravaConnected: Boolean(user.stravaId),
+      discoverable: user.discoverable !== false,
+      createdAt: user.createdAt,
+      lastLoginAt: user.lastLoginAt || null,
+      lastActiveAt: user.lastActiveAt || user.updatedAt || null,
+      totalActivities: activity?.totalActivities || 0,
+      recentActivities: activity?.recentActivities || 0,
+      requestsWindow: usage?.requests || 0,
+      lastRequestAt: usage?.lastRequestAt || null
+    };
+  });
+
+  return {
+    windowDays,
+    totalUsers,
+    listed: directory.length,
+    users: directory,
+    generatedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   buildAdminOverview,
   buildApplicationInsights,
+  buildAdminUsersDirectory,
   aggregateUsageByEvent,
   dailyUsageSeries
 };

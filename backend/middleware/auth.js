@@ -39,6 +39,9 @@ module.exports = async function authMiddleware(req, res, next) {
     req.user = user;
     req.auth0 = claims;
 
+    const { touchUserActivity } = require('../services/userActivity');
+    touchUserActivity(user._id);
+
     next();
   } catch (error) {
     return res.status(error.status || 401).json({

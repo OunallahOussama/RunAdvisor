@@ -153,6 +153,8 @@ router.post('/sync', auth, async (req, res) => {
 
     user.authProvider = 'auth0';
     user.updatedAt = new Date();
+    const { touchUserActivity } = require('../services/userActivity');
+    touchUserActivity(user._id, { isLogin: true });
     await user.save();
     invalidateUserCache(req.auth0?.sub);
 

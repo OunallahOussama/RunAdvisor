@@ -107,6 +107,8 @@ const userSchema = new mongoose.Schema({
   /** Community: show in user search when true (default on). */
   discoverable: { type: Boolean, default: true },
   socialBio: { type: String, trim: true, maxlength: 280, default: '' },
+  lastLoginAt: Date,
+  lastActiveAt: Date,
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

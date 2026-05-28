@@ -202,7 +202,9 @@ export const adminApi = {
   getMe: () => api.get('/admin/me'),
   getOverview: (days = 7) => api.get('/admin/overview', { params: { days } }),
   getUsage: (days = 7) => api.get('/admin/usage', { params: { days } }),
-  getInsights: (days = 7) => api.get('/admin/insights', { params: { days } })
+  getInsights: (days = 7) => api.get('/admin/insights', { params: { days } }),
+  getUsers: (days = 30, limit = 200) =>
+    api.get('/admin/users', { params: { days, limit } })
 };
 
 // Users (consent + onboarding) endpoints
@@ -224,7 +226,6 @@ export const notificationsApi = {
 
 export const socialApi = {
   searchUsers: (q) => api.get('/social/users/search', { params: { q } }),
-  getMembers: () => api.get('/social/members'),
   getIncomingFriendRequests: () => api.get('/social/friends/requests/incoming'),
   getFriends: () => api.get('/social/friends'),
   getFollowing: () => api.get('/social/following'),
