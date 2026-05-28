@@ -427,7 +427,13 @@ function WeeklyPlanDayCard({
   );
 }
 
-export function WeeklyPlanGrid({ weeklyPlan = [], planStartDate, nextSessionDetail, stravaConnected }) {
+export function WeeklyPlanGrid({
+  weeklyPlan = [],
+  planStartDate,
+  nextSessionDetail,
+  stravaConnected,
+  hideHeader = false
+}) {
   const days = weeklyPlan.slice(0, 7);
   if (days.length === 0) {
     return null;
@@ -435,22 +441,26 @@ export function WeeklyPlanGrid({ weeklyPlan = [], planStartDate, nextSessionDeta
 
   return (
     <Box>
-      <Typography
-        variant="caption"
-        sx={{
-          textTransform: 'uppercase',
-          letterSpacing: 0.6,
-          fontWeight: 700,
-          color: 'text.secondary',
-          display: 'block',
-          mb: 1
-        }}
-      >
-        Next 7 days plan
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-        Tap a day for full session details, calendar export, or Strava logging.
-      </Typography>
+      {!hideHeader ? (
+        <>
+          <Typography
+            variant="caption"
+            sx={{
+              textTransform: 'uppercase',
+              letterSpacing: 0.6,
+              fontWeight: 700,
+              color: 'text.secondary',
+              display: 'block',
+              mb: 1
+            }}
+          >
+            Next 7 days plan
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Tap a day for full session details, calendar export, or Strava logging.
+          </Typography>
+        </>
+      ) : null}
       <Box
         data-testid="weekly-plan-timeline"
         sx={{

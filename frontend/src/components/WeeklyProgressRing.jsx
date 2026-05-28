@@ -7,7 +7,13 @@ import { formatNumber } from '../utils/format';
 /**
  * Garmin Connect–style weekly distance ring vs target.
  */
-function WeeklyProgressRing({ currentKm = 0, targetKm = 0, label = 'Weekly distance', size = 96 }) {
+function WeeklyProgressRing({
+  currentKm = 0,
+  targetKm = 0,
+  label = 'Weekly distance',
+  size = 96,
+  ringTestId = 'weekly-progress-ring'
+}) {
   const theme = useTheme();
   const safeTarget = Number(targetKm) > 0 ? Number(targetKm) : 0;
   const safeCurrent = Math.max(0, Number(currentKm) || 0);
@@ -19,7 +25,7 @@ function WeeklyProgressRing({ currentKm = 0, targetKm = 0, label = 'Weekly dista
 
   return (
     <Box
-      data-testid="weekly-progress-ring"
+      data-testid={ringTestId}
       sx={{
         display: 'flex',
         flexDirection: 'column',

@@ -64,6 +64,12 @@ describe('reportService - fallback report', () => {
     expect(report.nextSessionDetail).toBeDefined();
     expect(Array.isArray(report.weeklyPlan)).toBe(true);
     expect(report.weeklyPlan.length).toBe(7);
+    expect(report.planPeriod).toMatchObject({
+      basedOnLastDays: analytics.window.days,
+      rollingDays: 7
+    });
+    expect(report.planPeriod.startsAt).toBeTruthy();
+    expect(report.planPeriod.endsAt).toBeTruthy();
     expect(Array.isArray(report.fourWeekOutlook)).toBe(true);
     expect(report.fourWeekOutlook.length).toBe(4);
     expect(report.keyMetrics).toBeDefined();

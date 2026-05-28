@@ -129,6 +129,23 @@ function PrivacyConsentPanel({ onReplayTour }) {
           <FormControlLabel
             control={
               <Switch
+                checked={consent.notifications.stravaBackgroundSync !== false}
+                onChange={(_, v) => update({ notifications: { stravaBackgroundSync: v } })}
+                disabled={saving}
+              />
+            }
+            label="Background Strava sync"
+          />
+          <Typography variant="caption" color="text.secondary" sx={{ pl: 6, mt: -1 }}>
+            While the app or PWA is open on your phone, sync recent Strava activities about every 30 minutes
+            and notify you when new runs are imported.
+          </Typography>
+        </Stack>
+
+        <Stack spacing={0.5} sx={{ mt: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
                 checked={consent.notifications.browser}
                 onChange={(_, v) => update({ notifications: { browser: v } })}
                 disabled={saving}

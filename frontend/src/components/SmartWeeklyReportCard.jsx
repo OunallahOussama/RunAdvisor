@@ -27,6 +27,8 @@ import {
   TrendIcon
 } from './icons';
 import { WeeklyPlanGrid } from './WeeklyPlanDayCard';
+import WeeklyPlanCommitmentPanel from './WeeklyPlanCommitmentPanel';
+import RollingTrainingPlanCard from './RollingTrainingPlanCard';
 import { formatNumber, formatPaceLabel, formatDeltaPercent, formatPaceDeltaSec, TRAINING_METRIC_TOOLTIPS } from '../utils/format';
 
 const WINDOW_OPTIONS = [
@@ -240,7 +242,8 @@ function SmartWeeklyReportCard({
   onRefresh,
   refreshing = false,
   stravaConnected = false,
-  compact = false
+  compact = false,
+  onPlanCommitmentUpdated
 }) {
   const analytics = data?.analytics || null;
   const report = data?.report || null;
@@ -362,9 +365,15 @@ function SmartWeeklyReportCard({
                 ) : null}
               </Stack>
             ) : null}
-            <Typography variant={compact ? 'h6' : 'h5'} fontWeight={700} sx={{ mt: compact ? 0 : 1, lineHeight: 1.2 }}>
-              {exec?.headline || (loading ? 'Loading…' : compact ? 'Weekly insight' : 'Smart weekly summary')}
-            </Typography>
+            {compact ? (
+              <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 0, lineHeight: 1.2 }} color="text.secondary">
+                Weekly insight
+              </Typography>
+            ) : (
+              <Typography variant="h5" component="h2" fontWeight={700} sx={{ mt: 1, lineHeight: 1.2 }}>
+                {exec?.headline || (loading ? 'Loading…' : 'Smart weekly summary')}
+              </Typography>
+            )}
             {compact && phase ? (
               <Chip
                 data-testid="readiness-phase-chip"
@@ -506,14 +515,40 @@ function SmartWeeklyReportCard({
               </Stack>
             ) : null}
 
-            {!compact ? <NextSessionMini next={report?.nextSessionDetail} /> : null}
+            <NextSessionMini next={report?.nextSessionDetail} />
 
-            <WeeklyPlanGrid
-              weeklyPlan={report?.weeklyPlan}
-              planStartDate={data?.generatedAt || report?.generatedAt}
-              nextSessionDetail={compact ? null : report?.nextSessionDetail}
-              stravaConnected={stravaConnected}
-            />
+            {compact ? (
+              Array.isArray(report?.weeklyPlan) && report.weeklyPlan.length > 0 ? (
+                <RollingTrainingPlanCard
+                  weeklyPlan={report.weeklyPlan}
+                  planStartDate={data?.generatedAt || report?.generatedAt}
+                  planPeriod={report?.planPeriod}
+                  phase={exec?.readinessPhase}
+                  reportId={data?.id}
+                  generatedAt={data?.generatedAt || report?.generatedAt}
+                  planCommitment={data?.planCommitment}
+                  onPlanCommitmentUpdated={onPlanCommitmentUpdated}
+                />
+              ) : null
+            ) : (
+              <>
+                {Array.isArray(report?.weeklyPlan) && report.weeklyPlan.length > 0 ? (
+                  <WeeklyPlanCommitmentPanel
+                    reportId={data?.id}
+                    generatedAt={data?.generatedAt || report?.generatedAt}
+                    planCommitment={data?.planCommitment}
+                    onUpdated={onPlanCommitmentUpdated}
+                    compact={false}
+                  />
+                ) : null}
+                <WeeklyPlanGrid
+                  weeklyPlan={report?.weeklyPlan}
+                  planStartDate={data?.generatedAt || report?.generatedAt}
+                  nextSessionDetail={report?.nextSessionDetail}
+                  stravaConnected={stravaConnected}
+                />
+              </>
+            )}
 
             {!compact ? (
               <Stack

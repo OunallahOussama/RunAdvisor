@@ -22,6 +22,7 @@ import {
 import PaceInput, { paceFieldsFromDecimal } from '../components/PaceInput';
 import { minSecToDecimalPace, formatMetric, getRaceCountdown } from '../utils/format';
 import PrivacyConsentPanel from '../components/PrivacyConsentPanel';
+import TrainingChallengesEditor from '../components/TrainingChallengesEditor';
 import { useAppShell, useScreenChrome } from '../context/AppShellContext';
 
 const GOAL_OPTIONS = ['endurance', 'speed', 'recovery', 'race', 'consistency'];
@@ -35,6 +36,9 @@ function TrainingProfile() {
     preferredDistance: '10',
     goalPaceMinPerKm: '6.0',
     weeklyTrainingLoadKm: '30',
+    monthlyDistanceGoalKm: '',
+    yearlyDistanceGoalKm: '',
+    trainingChallenges: [],
     goalRaceName: '',
     goalRaceDate: '',
     goalRaceDistanceKm: '10',
@@ -60,6 +64,11 @@ function TrainingProfile() {
       preferredDistance: String(profile.preferredDistance ?? 10),
       goalPaceMinPerKm: String(profile.goalPaceMinPerKm ?? 6),
       weeklyTrainingLoadKm: String(profile.weeklyTrainingLoadKm ?? 30),
+      monthlyDistanceGoalKm:
+        profile.monthlyDistanceGoalKm != null ? String(profile.monthlyDistanceGoalKm) : '',
+      yearlyDistanceGoalKm:
+        profile.yearlyDistanceGoalKm != null ? String(profile.yearlyDistanceGoalKm) : '',
+      trainingChallenges: profile.trainingChallenges?.length ? [...profile.trainingChallenges] : [],
       goalRaceName: profile.goalRaceName || '',
       goalRaceDate: profile.goalRaceDate
         ? new Date(profile.goalRaceDate).toISOString().split('T')[0]
@@ -96,6 +105,11 @@ function TrainingProfile() {
         preferredDistance: Number(form.preferredDistance),
         goalPaceMinPerKm: goalPace ?? Number(form.goalPaceMinPerKm),
         weeklyTrainingLoadKm: Number(form.weeklyTrainingLoadKm),
+        monthlyDistanceGoalKm: form.monthlyDistanceGoalKm
+          ? Number(form.monthlyDistanceGoalKm)
+          : null,
+        yearlyDistanceGoalKm: form.yearlyDistanceGoalKm ? Number(form.yearlyDistanceGoalKm) : null,
+        trainingChallenges: form.trainingChallenges,
         goalRaceName: form.goalRaceName,
         goalRaceDate: form.goalRaceDate || null,
         goalRaceDistanceKm: Number(form.goalRaceDistanceKm),
@@ -137,6 +151,26 @@ function TrainingProfile() {
             <Typography variant="h6" fontWeight={600}>
               Goals & load
             </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                label="Monthly km goal"
+                onChange={(e) => setForm({ ...form, monthlyDistanceGoalKm: e.target.value })}
+                type="number"
+                inputProps={{ min: 10, step: 5 }}
+                value={form.monthlyDistanceGoalKm}
+                helperText="Shown on Today as your main progress ring."
+              />
+              <TextField
+                fullWidth
+                label="Yearly km goal"
+                onChange={(e) => setForm({ ...form, yearlyDistanceGoalKm: e.target.value })}
+                type="number"
+                inputProps={{ min: 50, step: 10 }}
+                value={form.yearlyDistanceGoalKm}
+                helperText="Year-to-date progress on the home goals card."
+              />
+            </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'flex-start' }}>
               <PaceInput
                 label="Goal pace"
@@ -215,6 +249,14 @@ function TrainingProfile() {
                 sx={{ alignSelf: 'flex-start' }}
               />
             ) : null}
+
+            <Typography variant="h6" fontWeight={600}>
+              Challenges
+            </Typography>
+            <TrainingChallengesEditor
+              challenges={form.trainingChallenges}
+              onChange={(trainingChallenges) => setForm({ ...form, trainingChallenges })}
+            />
 
             <Typography variant="subtitle2" color="text.secondary">
               Training focus

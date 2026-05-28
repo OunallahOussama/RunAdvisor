@@ -76,9 +76,11 @@ function ActivityRouteMap({ encodedPolyline, title = 'Route' }) {
 
   return (
     <Box sx={{ width: 1 }}>
-      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-        {title}
-      </Typography>
+      {title ? (
+        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+          {title}
+        </Typography>
+      ) : null}
       <Box
         sx={{
           borderRadius: 2,

@@ -143,8 +143,23 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
         flexDirection: 'column'
       }}
     >
-      <AppBar position="sticky">
-        <Toolbar sx={{ gap: 1, px: { xs: 2, md: 3 } }}>
+      <AppBar
+        position="sticky"
+        elevation={0}
+        sx={{
+          borderBottom: 1,
+          borderColor: 'divider',
+          bgcolor: 'background.paper'
+        }}
+      >
+        <Toolbar
+          sx={{
+            gap: 1,
+            px: { xs: 1.5, md: 3 },
+            minHeight: { xs: 52, md: 64 },
+            pt: 'env(safe-area-inset-top, 0px)'
+          }}
+        >
           <Box
             component={RouterLink}
             to="/"
@@ -184,19 +199,20 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
             sx={{
               flex: 1,
               fontWeight: 600,
-              ml: isMobile ? 1 : 2,
+              ml: isMobile ? 0.5 : 2,
               minWidth: 0,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              textAlign: isMobile ? 'center' : 'left'
             }}
           >
             {title}
           </Typography>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
+          <Stack direction="row" alignItems="center" spacing={0.25}>
             {!isMobile ? <StravaStatusIndicator compact /> : null}
             {user ? <MemberSearchButton /> : null}
-            <ThemeToggleButton />
+            {!isMobile ? <ThemeToggleButton /> : null}
             <NotificationBell enabled={Boolean(user)} consent={consent} />
             <ProfileMenu user={user} onLogout={onLogout} onReplayTour={onReplayTour} />
           </Stack>
@@ -273,9 +289,12 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
           sx={{
             flex: 1,
             minWidth: 0,
-            px: { xs: 2, md: 3 },
-            pt: { xs: 2, md: 3 },
-            pb: { xs: '96px', md: 4 }
+            px: { xs: 1.5, md: 3 },
+            pt: { xs: 1.5, md: 3 },
+            pb: {
+              xs: 'calc(72px + env(safe-area-inset-bottom, 0px))',
+              md: 4
+            }
           }}
         >
           {children}
@@ -290,7 +309,7 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
           sx={{
             position: 'fixed',
             right: 16,
-            bottom: 88,
+            bottom: 'calc(80px + env(safe-area-inset-bottom, 0px))',
             zIndex: (t) => t.zIndex.appBar
           }}
           data-testid="appshell-fab"
@@ -301,16 +320,18 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
 
       {isMobile ? (
         <Paper
-          elevation={0}
+          elevation={8}
           sx={{
             position: 'fixed',
             bottom: 0,
             left: 0,
             right: 0,
             zIndex: (t) => t.zIndex.appBar,
-            borderRadius: 0,
+            borderRadius: '16px 16px 0 0',
             borderTop: 1,
-            borderColor: 'divider'
+            borderColor: 'divider',
+            pb: 'env(safe-area-inset-bottom, 0px)',
+            bgcolor: 'background.paper'
           }}
         >
           <BottomNavigation
@@ -320,12 +341,31 @@ function AppShell({ user, consent, onLogout, onReplayTour, children }) {
               const target = NAV_ITEMS[value];
               if (target) navigate(target.value);
             }}
+            sx={{
+              height: 64,
+              '& .MuiBottomNavigationAction-root': {
+                minWidth: 0,
+                py: 0.75,
+                color: 'text.secondary',
+                '&.Mui-selected': {
+                  color: 'primary.main'
+                }
+              },
+              '& .MuiBottomNavigationAction-label': {
+                fontSize: '0.65rem',
+                fontWeight: 500,
+                '&.Mui-selected': {
+                  fontSize: '0.65rem',
+                  fontWeight: 700
+                }
+              }
+            }}
           >
             {NAV_ITEMS.map(({ value, label, Icon }) => (
               <BottomNavigationAction
                 key={value}
                 label={label}
-                icon={<Icon />}
+                icon={<Icon sx={{ fontSize: 22 }} />}
                 value={NAV_ITEMS.findIndex((n) => n.value === value)}
               />
             ))}

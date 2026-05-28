@@ -8,7 +8,8 @@ import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import { activitiesApi, coachApi } from '../services/api';
+import { activitiesApi, coachApi, trainingApi } from '../services/api';
+import TrainingGoalsCard from '../components/TrainingGoalsCard';
 import FeedRow from '../components/FeedRow';
 import SmartWeeklyReportCard from '../components/SmartWeeklyReportCard';
 import TodayHeroCard from '../components/TodayHeroCard';
@@ -20,13 +21,16 @@ const HOME_WEEKLY_REPORT_KEY = 'home-weekly-report';
 const HOME_RECENT_ACTIVITIES_KEY = 'home-recent-activities';
 
 function Dashboard() {
-  const { profile } = useRunAdvisorProfile();
+  const { profile, refreshProfile } = useRunAdvisorProfile();
   const [weeklyReport, setWeeklyReport] = useState(() => loadSnapshot(HOME_WEEKLY_REPORT_KEY)?.data || null);
   const [reportLoading, setReportLoading] = useState(true);
   const [reportRefreshing, setReportRefreshing] = useState(false);
   const [reportError, setReportError] = useState('');
   const [recentActivities, setRecentActivities] = useState(() => loadSnapshot(HOME_RECENT_ACTIVITIES_KEY)?.data || []);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [trainingProgress, setTrainingProgress] = useState(null);
+  const [progressLoading, setProgressLoading] = useState(true);
+  const [progressError, setProgressError] = useState('');
 
   const loadWeeklyReport = useMemo(() => async ({ force = false } = {}) => {
     if (force) setReportRefreshing(true); else setReportLoading(true);
@@ -65,6 +69,26 @@ function Dashboard() {
 
   useEffect(() => {
     let cancelled = false;
+    setProgressLoading(true);
+    trainingApi
+      .getProgress()
+      .then((res) => {
+        if (cancelled) return;
+        setTrainingProgress(res?.data?.progress || null);
+        setProgressError('');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setProgressError(err?.response?.data?.error || err.message || '');
+      })
+      .finally(() => {
+        if (!cancelled) setProgressLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setRecentLoading(true);
     activitiesApi
       .getActivities(3, 0)
@@ -90,10 +114,18 @@ function Dashboard() {
   const stravaConnected = Boolean(profile?.stravaId);
 
   return (
-    <Box component="section">
+    <Box component="section" sx={{ maxWidth: { xs: 480, md: 640 }, mx: 'auto' }}>
       {reportError && weeklyReport ? (
         <Alert severity="info" sx={{ mb: 1.5 }}>{reportError}</Alert>
       ) : null}
+
+      <Box sx={{ mb: 2 }}>
+        <TrainingGoalsCard
+          progress={trainingProgress}
+          loading={progressLoading}
+          error={progressError}
+        />
+      </Box>
 
       {!reportLoading && weeklyReport ? (
         <Box sx={{ mb: 2 }}>
@@ -105,6 +137,7 @@ function Dashboard() {
             weeklyTargetKm={profile?.weeklyTrainingLoadKm}
             goalRaceDate={profile?.goalRaceDate}
             goalRaceName={profile?.goalRaceName}
+            runningGoal={profile?.runningGoal}
           />
         </Box>
       ) : null}
@@ -118,6 +151,10 @@ function Dashboard() {
         windowDays={7}
         onRefresh={() => loadWeeklyReport({ force: true })}
         stravaConnected={stravaConnected}
+        onPlanCommitmentUpdated={() => {
+          refreshProfile();
+          loadWeeklyReport({ force: true });
+        }}
       />
 
       <Card variant="outlined" sx={{ mt: 2 }} data-testid="home-recent-feed">

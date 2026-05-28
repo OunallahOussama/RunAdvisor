@@ -2,6 +2,10 @@ const express = require('express');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { invalidateUserCache } = require('../services/userResolver');
+const {
+  getWeeklyPlanCommitmentState,
+  updateWeeklyPlanCommitment
+} = require('../services/weeklyPlanCommitment');
 
 const router = express.Router();
 
@@ -15,7 +19,8 @@ function serializeConsent(user) {
     notifications: {
       browser: Boolean(consent.notifications?.browser),
       recommendations: consent.notifications?.recommendations !== false,
-      weeklyReport: consent.notifications?.weeklyReport !== false
+      weeklyReport: consent.notifications?.weeklyReport !== false,
+      stravaBackgroundSync: consent.notifications?.stravaBackgroundSync !== false
     },
     stravaActivityInsights: consent.stravaActivityInsights !== false,
     consentVersion: consent.consentVersion || null,
@@ -80,10 +85,13 @@ router.put('/me/consent', auth, async (req, res) => {
 
     if (body.notifications && typeof body.notifications === 'object') {
       user.consent.notifications = user.consent.notifications || {};
-      const { browser, recommendations, weeklyReport } = body.notifications;
+      const { browser, recommendations, weeklyReport, stravaBackgroundSync } = body.notifications;
       if (typeof browser === 'boolean') user.consent.notifications.browser = browser;
       if (typeof recommendations === 'boolean') user.consent.notifications.recommendations = recommendations;
       if (typeof weeklyReport === 'boolean') user.consent.notifications.weeklyReport = weeklyReport;
+      if (typeof stravaBackgroundSync === 'boolean') {
+        user.consent.notifications.stravaBackgroundSync = stravaBackgroundSync;
+      }
     }
 
     if (body.acceptVersion) {
@@ -151,6 +159,55 @@ router.put('/me/onboarding-complete', auth, async (req, res) => {
  * Return a slim self-profile including onboarding + consent state so the
  * frontend can decide what to show on first authenticated load.
  */
+/**
+ * GET /api/users/me/weekly-plan-commitment?reportId=&generatedAt=
+ * Returns commitment for current user vs optional report key + adherence check.
+ */
+router.get('/me/weekly-plan-commitment', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const state = await getWeeklyPlanCommitmentState(user, {
+      reportId: req.query.reportId,
+      generatedAt: req.query.generatedAt,
+      weeklyPlan: []
+    });
+
+    res.json({ success: true, ...state });
+  } catch (error) {
+    console.error('Weekly plan commitment fetch error:', error);
+    res.status(500).json({ error: 'Failed to load plan commitment' });
+  }
+});
+
+/**
+ * PUT /api/users/me/weekly-plan-commitment
+ * Body: { reportId, generatedAt, status: 'following' | 'declined' | 'pending' }
+ */
+router.put('/me/weekly-plan-commitment', auth, async (req, res) => {
+  try {
+    const { reportId, generatedAt, status } = req.body || {};
+    const commitment = await updateWeeklyPlanCommitment(req.userId, {
+      reportId,
+      generatedAt,
+      status
+    });
+
+    invalidateUserCache(req.auth0?.sub);
+
+    res.json({ success: true, commitment });
+  } catch (error) {
+    console.error('Weekly plan commitment update error:', error);
+    res.status(error.status || 500).json({
+      error: 'Failed to update plan commitment',
+      message: error.message
+    });
+  }
+});
+
 router.get('/me', auth, async (req, res) => {
   try {
     const user = await User.findById(req.userId);

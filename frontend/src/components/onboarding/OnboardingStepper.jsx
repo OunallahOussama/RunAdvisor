@@ -19,17 +19,18 @@ import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
+import SyncIcon from '@mui/icons-material/Sync';
 import { coachApi, usersApi } from '../../services/api';
+import { TRAINING_GOAL_CHOICES, getTrainingGoalMeta } from '../../constants/trainingGoals';
 
 const STEPS = ['Welcome', 'Connect Strava', 'Choose your goal', 'Notifications & consent', 'Ready to go'];
 
-const GOAL_CHOICES = [
-  { value: '5k', label: '5K' },
-  { value: '10k', label: '10K' },
-  { value: 'half', label: 'Half marathon' },
-  { value: 'marathon', label: 'Marathon' },
-  { value: 'general_fitness', label: 'General fitness' }
-];
+const centeredStepSx = {
+  maxWidth: 480,
+  mx: 'auto',
+  textAlign: 'center',
+  alignItems: 'center'
+};
 
 function OnboardingStepper({ open, user, onComplete, onSkip }) {
   const muiTheme = useMuiTheme();
@@ -41,7 +42,8 @@ function OnboardingStepper({ open, user, onComplete, onSkip }) {
     notifications: {
       browser: true,
       recommendations: true,
-      weeklyReport: true
+      weeklyReport: true,
+      stravaBackgroundSync: true
     },
     shareAnonymizedTraining: false,
     privacyAccepted: false
@@ -99,17 +101,21 @@ function OnboardingStepper({ open, user, onComplete, onSkip }) {
 
   const next = () => setActive((a) => Math.min(a + 1, STEPS.length - 1));
   const back = () => setActive((a) => Math.max(a - 1, 0));
+  const selectedGoal = getTrainingGoalMeta(goal);
 
   const renderStepBody = () => {
     switch (active) {
       case 0:
         return (
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={centeredStepSx}>
+            <Typography variant="h6" fontWeight={700}>
+              Welcome to RunAdvisor
+            </Typography>
             <Typography variant="body1">
-              Welcome to RunAdvisor. We turn your runs into a personal weekly coach report with clear next steps.
+              Your runs become a weekly coach report with clear next steps — pace, load, and what to do next.
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              In under a minute, we will connect your data, ask what you are training for, and tune notifications.
+              Connect Strava, pick a goal, and tune notifications in under a minute.
             </Typography>
           </Stack>
         );
@@ -134,26 +140,82 @@ function OnboardingStepper({ open, user, onComplete, onSkip }) {
         );
       case 2:
         return (
-          <Stack spacing={2}>
-            <Typography variant="body1">What are you training for right now?</Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-              {GOAL_CHOICES.map((choice) => (
+          <Stack spacing={2.5} sx={centeredStepSx} data-testid="onboarding-goals">
+            <Typography variant="h6" fontWeight={700}>
+              What are you training for?
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tap a goal — we tailor your weekly plan and home screen around it.
+            </Typography>
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              flexWrap="wrap"
+              justifyContent="center"
+              sx={{ width: 1 }}
+            >
+              {TRAINING_GOAL_CHOICES.map((choice) => (
                 <Chip
                   key={choice.value}
                   label={choice.label}
                   color={goal === choice.value ? 'primary' : 'default'}
                   onClick={() => setGoal(choice.value)}
                   variant={goal === choice.value ? 'filled' : 'outlined'}
-                  sx={{ minHeight: 40 }}
+                  sx={{ minHeight: 44, px: 0.5, fontWeight: goal === choice.value ? 700 : 500 }}
                 />
               ))}
             </Stack>
+            <Box
+              sx={{
+                width: 1,
+                textAlign: 'left',
+                p: 2,
+                borderRadius: 2,
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'action.hover'
+              }}
+            >
+              <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+                {selectedGoal.label} · {selectedGoal.subtitle}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" paragraph sx={{ mb: 1 }}>
+                {selectedGoal.description}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Typical volume: {selectedGoal.weeklyKm}
+              </Typography>
+            </Box>
           </Stack>
         );
       case 3:
         return (
-          <Stack spacing={1.5}>
-            <Typography variant="body1">Choose how RunAdvisor talks to you and what it can share.</Typography>
+          <Stack spacing={1.5} sx={{ maxWidth: 520, mx: 'auto' }}>
+            <Typography variant="h6" fontWeight={700} textAlign="center">
+              Notifications &amp; sync
+            </Typography>
+            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mb: 1 }}>
+              Stay updated when reports land and keep Strava in sync while the app is open on your phone.
+            </Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={consent.notifications.stravaBackgroundSync}
+                  onChange={(_, v) => updateConsent('notifications.stravaBackgroundSync', v)}
+                />
+              }
+              label={
+                <Stack direction="row" spacing={0.75} alignItems="center">
+                  <SyncIcon fontSize="small" color="action" />
+                  <span>Background Strava sync (every ~30 min)</span>
+                </Stack>
+              }
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ pl: 6, mt: -1, display: 'block' }}>
+              When RunAdvisor is open or installed on your home screen, we quietly pull your latest Strava
+              activities — like a light cron job on your device. Add to home screen on mobile for best results.
+            </Typography>
             <FormControlLabel
               control={
                 <Switch
@@ -246,7 +308,9 @@ function OnboardingStepper({ open, user, onComplete, onSkip }) {
             </Step>
           ))}
         </Stepper>
-        <Box>{renderStepBody()}</Box>
+        <Box sx={{ minHeight: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {renderStepBody()}
+        </Box>
         {error ? (
           <Typography color="error" variant="body2" sx={{ mt: 2 }}>
             {error}

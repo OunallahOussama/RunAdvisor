@@ -16,8 +16,17 @@
  */
 
 const OpenAI = require('openai');
+const { buildPlanPeriod } = require('./planPeriod');
 
 const TIMEOUT_MS = 60 * 1000;
+
+function attachPlanPeriod(report, analytics) {
+  const basedOn = analytics?.window?.days || 7;
+  return {
+    ...report,
+    planPeriod: buildPlanPeriod(report.generatedAt, basedOn)
+  };
+}
 
 function paceLabel(minPerKm) {
   if (!Number.isFinite(Number(minPerKm)) || Number(minPerKm) <= 0) {
@@ -177,7 +186,7 @@ function buildFallbackReport(analytics, user = {}, options = {}) {
     { week: 4, focus: 'Down / consolidation', volumeKm: (analytics.volume?.totalDistanceKm / 4 || 30) * 0.85, qualitySessions: 1, notes: 'Reduce volume ~15%. Keep one short race-pace session.' }
   ];
 
-  return {
+  const report = {
     generatedAt: new Date().toISOString(),
     windowDays: analytics.window?.days || 0,
     source: 'fallback',
@@ -269,6 +278,8 @@ function buildFallbackReport(analytics, user = {}, options = {}) {
     fourWeekOutlook,
     keyMetrics: fallbackKeyMetrics(analytics)
   };
+
+  return attachPlanPeriod(report, analytics);
 }
 
 function buildOpenAiPrompt(analytics, user, options) {
@@ -370,7 +381,7 @@ async function generateReport(analytics, user = {}, options = {}) {
   const fallback = () => buildFallbackReport(analytics, user, options);
 
   if (!process.env.OPENAI_API_KEY) {
-    return { ...fallback(), source: 'fallback' };
+    return attachPlanPeriod({ ...fallback(), source: 'fallback' }, analytics);
   }
 
   try {
@@ -391,7 +402,7 @@ async function generateReport(analytics, user = {}, options = {}) {
     const raw = completion.choices?.[0]?.message?.content || '{}';
     const parsed = JSON.parse(raw);
 
-    return {
+    const report = {
       generatedAt: new Date().toISOString(),
       windowDays: analytics.window?.days || 0,
       source: 'openai',
@@ -411,9 +422,13 @@ async function generateReport(analytics, user = {}, options = {}) {
       // keyMetrics always sourced from analytics — never trust the model
       keyMetrics: fallbackKeyMetrics(analytics)
     };
+    return attachPlanPeriod(report, analytics);
   } catch (error) {
     console.error('OpenAI training report failed:', error.message || error);
-    return { ...fallback(), source: 'fallback_error', error: error.message || 'unknown' };
+    return attachPlanPeriod(
+      { ...fallback(), source: 'fallback_error', error: error.message || 'unknown' },
+      analytics
+    );
   }
 }
 

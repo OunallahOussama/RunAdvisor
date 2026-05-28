@@ -208,12 +208,19 @@ export const adminApi = {
 };
 
 // Users (consent + onboarding) endpoints
+export const trainingApi = {
+  getProgress: () => api.get('/training/progress'),
+  updateChallenges: (challenges) => api.put('/training/challenges', { challenges })
+};
+
 export const usersApi = {
   getMe: () => api.get('/users/me'),
   getConsent: () => api.get('/users/me/consent'),
   updateConsent: (payload) => api.put('/users/me/consent', payload),
   completeOnboarding: ({ runningGoal, reset } = {}) =>
-    api.put('/users/me/onboarding-complete', { runningGoal, reset })
+    api.put('/users/me/onboarding-complete', { runningGoal, reset }),
+  updateWeeklyPlanCommitment: ({ reportId, generatedAt, status }) =>
+    api.put('/users/me/weekly-plan-commitment', { reportId, generatedAt, status })
 };
 
 // Notification center endpoints

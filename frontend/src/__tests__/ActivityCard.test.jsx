@@ -4,19 +4,21 @@ import { render, screen } from '@testing-library/react';
 import ActivityCard from '../components/ActivityCard';
 import { ThemeProvider } from '../context/ThemeContext';
 
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  configurable: true,
-  value: (query) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(),
-    removeListener: jest.fn(),
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn()
-  })
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: (query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(),
+      removeListener: jest.fn(),
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn()
+    })
+  });
 });
 
 describe('ActivityCard', () => {
@@ -46,6 +48,7 @@ describe('ActivityCard', () => {
     expect(screen.getByText(/Morning Run/i)).toBeInTheDocument();
     expect(screen.getByText(/5 km/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Morning Run/i })).toHaveAttribute('href', '/activities/abc123');
+    expect(screen.getByText(/Double-click to preview/i)).toBeInTheDocument();
     expect(screen.queryByText(/Details/i)).not.toBeInTheDocument();
   });
 });

@@ -10,16 +10,22 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Checkbox from '@mui/material/Checkbox';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import Fab from '@mui/material/Fab';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import AddIcon from '@mui/icons-material/Add';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { activitiesApi } from '../services/api';
 import ActivityCard from '../components/ActivityCard';
+import ActivityPreviewSheet from '../components/ActivityPreviewSheet';
 import ActivityStatStrip from '../components/ActivityStatStrip';
 import WeeklyProgressRing from '../components/WeeklyProgressRing';
 import DeleteActivityDialog from '../components/DeleteActivityDialog';
@@ -67,8 +73,12 @@ function formatCreatedActivitySummary(activity) {
 
 function Activities() {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const { profile } = useRunAdvisorProfile();
   const stravaConnected = Boolean(profile?.stravaId);
+  const [previewActivity, setPreviewActivity] = useState(null);
+  const [addExpanded, setAddExpanded] = useState(false);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [listAlert, setListAlert] = useState(null);
@@ -229,7 +239,12 @@ function Activities() {
   };
 
   return (
-    <Box component="main">
+    <Box component="main" sx={{ maxWidth: isMobile ? 480 : 'none', mx: isMobile ? 'auto' : 0 }}>
+      <ActivityPreviewSheet
+        activity={previewActivity}
+        open={Boolean(previewActivity)}
+        onClose={() => setPreviewActivity(null)}
+      />
       <DeleteActivityDialog
         activity={activityToDelete}
         deleting={deletingActivity}
@@ -242,11 +257,25 @@ function Activities() {
         open={Boolean(activityToDelete)}
         stravaConnected={stravaConnected}
       />
-      <SemanticSearchBar />
+      {!isMobile ? <SemanticSearchBar /> : null}
 
-      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={2} alignItems="flex-start">
-        <Stack spacing={2} sx={{ flex: 1, width: 1 }}>
-          <Accordion variant="outlined" disableGutters sx={{ '&::before': { display: 'none' } }}>
+      {isMobile ? (
+        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+          <Chip size="small" variant="outlined" label={`${totalDistance} km`} />
+          <Chip size="small" variant="outlined" label={`${runActivities.length} runs`} />
+          {averagePace ? <Chip size="small" variant="outlined" label={averagePace} /> : null}
+        </Stack>
+      ) : null}
+
+      <Stack direction={{ xs: 'column', xl: 'row' }} spacing={isMobile ? 1.5 : 2} alignItems="flex-start">
+        <Stack spacing={isMobile ? 1 : 2} sx={{ flex: 1, width: 1 }}>
+          <Accordion
+            variant="outlined"
+            disableGutters
+            expanded={addExpanded}
+            onChange={(_, exp) => setAddExpanded(exp)}
+            sx={{ '&::before': { display: 'none' }, borderRadius: 3 }}
+          >
             <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-controls="add-run-content" id="add-run-header">
               <Typography variant="subtitle2" fontWeight={600}>
                 Add run manually
@@ -471,6 +500,7 @@ function Activities() {
           </Accordion>
         </Stack>
 
+        {!isMobile ? (
         <Card variant="outlined" sx={{ width: { xl: 280 }, flexShrink: 0, position: { xl: 'sticky' }, top: { xl: 16 } }}>
           <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
             {profile?.weeklyTrainingLoadKm > 0 ? (
@@ -494,9 +524,29 @@ function Activities() {
             />
           </CardContent>
         </Card>
+        ) : null}
       </Stack>
 
-      <Box sx={{ mt: 2 }}>
+      {isMobile ? (
+        <Fab
+          color="primary"
+          aria-label="Add run"
+          onClick={() => {
+            setAddExpanded(true);
+            document.getElementById('add-run-header')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }}
+          sx={{
+            position: 'fixed',
+            right: 16,
+            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+            zIndex: (t) => t.zIndex.speedDial
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      ) : null}
+
+      <Box sx={{ mt: isMobile ? 1 : 2 }}>
         {listAlert && (
           <Alert
             severity={listAlert.severity}
@@ -530,11 +580,24 @@ function Activities() {
             </CardContent>
           </Card>
         ) : (
-          <Stack spacing={2}>
-            {activities.map((activity) => (
-              <ActivityCard key={activity._id} activity={activity} onDelete={handleDeleteRequest} />
-            ))}
-          </Stack>
+          <>
+            {isMobile ? (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                Double-tap a run to preview · tap name to open
+              </Typography>
+            ) : null}
+            <Stack spacing={isMobile ? 0.75 : 2}>
+              {activities.map((activity) => (
+                <ActivityCard
+                  key={activity._id}
+                  activity={activity}
+                  compact={isMobile}
+                  onPreview={setPreviewActivity}
+                  onDelete={handleDeleteRequest}
+                />
+              ))}
+            </Stack>
+          </>
         )}
       </Box>
     </Box>

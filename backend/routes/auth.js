@@ -52,11 +52,35 @@ function serializeUser(user) {
     trainingGoals: user.trainingGoals,
     goalPaceMinPerKm: user.goalPaceMinPerKm,
     weeklyTrainingLoadKm: user.weeklyTrainingLoadKm,
+    monthlyDistanceGoalKm: user.monthlyDistanceGoalKm,
+    yearlyDistanceGoalKm: user.yearlyDistanceGoalKm,
+    trainingChallenges: Array.isArray(user.trainingChallenges)
+      ? user.trainingChallenges.map((c) => ({
+          id: c._id ? String(c._id) : undefined,
+          kind: c.kind,
+          title: c.title || '',
+          targetKm: c.targetKm,
+          targetPaceMinPerKm: c.targetPaceMinPerKm,
+          raceDistanceKm: c.raceDistanceKm,
+          active: c.active !== false,
+          createdAt: c.createdAt
+        }))
+      : [],
     goalRaceName: user.goalRaceName,
     goalRaceDate: user.goalRaceDate,
     goalRaceDistanceKm: user.goalRaceDistanceKm,
     discoverable: user.discoverable !== false,
     socialBio: user.socialBio || '',
+    weeklyPlanCommitment: user.weeklyPlanCommitment?.reportKey
+      ? {
+          reportKey: user.weeklyPlanCommitment.reportKey,
+          reportGeneratedAt: user.weeklyPlanCommitment.reportGeneratedAt,
+          status: user.weeklyPlanCommitment.status || 'pending',
+          decidedAt: user.weeklyPlanCommitment.decidedAt,
+          appliedScore: user.weeklyPlanCommitment.appliedScore,
+          appliedNote: user.weeklyPlanCommitment.appliedNote || ''
+        }
+      : null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   };
@@ -195,6 +219,9 @@ router.put('/preferences', auth, async (req, res) => {
       trainingGoals,
       goalPaceMinPerKm,
       weeklyTrainingLoadKm,
+      monthlyDistanceGoalKm,
+      yearlyDistanceGoalKm,
+      trainingChallenges,
       goalRaceName,
       goalRaceDate,
       goalRaceDistanceKm,
@@ -210,6 +237,15 @@ router.put('/preferences', auth, async (req, res) => {
     if (Array.isArray(trainingGoals)) update.trainingGoals = trainingGoals;
     if (goalPaceMinPerKm != null) update.goalPaceMinPerKm = Number(goalPaceMinPerKm);
     if (weeklyTrainingLoadKm != null) update.weeklyTrainingLoadKm = Number(weeklyTrainingLoadKm);
+    if (monthlyDistanceGoalKm != null) update.monthlyDistanceGoalKm = Number(monthlyDistanceGoalKm);
+    if (yearlyDistanceGoalKm != null) update.yearlyDistanceGoalKm = Number(yearlyDistanceGoalKm);
+    if (Array.isArray(trainingChallenges)) {
+      const { normalizeChallengesInput } = require('../services/trainingProgress');
+      const normalized = normalizeChallengesInput(trainingChallenges);
+      if (normalized !== null) {
+        update.trainingChallenges = normalized;
+      }
+    }
     if (goalRaceName != null) update.goalRaceName = String(goalRaceName).trim();
     if (goalRaceDate != null) update.goalRaceDate = goalRaceDate ? new Date(goalRaceDate) : null;
     if (goalRaceDistanceKm != null) update.goalRaceDistanceKm = Number(goalRaceDistanceKm);

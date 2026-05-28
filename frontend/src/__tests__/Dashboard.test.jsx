@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
-import { activitiesApi, coachApi } from '../services/api';
+import { activitiesApi, coachApi, trainingApi } from '../services/api';
 import { ThemeProvider } from '../context/ThemeContext';
 import { AppShellProvider } from '../context/AppShellContext';
 import { RunAdvisorProfileProvider } from '../context/RunAdvisorProfileContext';
@@ -31,6 +31,9 @@ jest.mock('../services/api', () => ({
   },
   coachApi: {
     weeklySummary: jest.fn()
+  },
+  trainingApi: {
+    getProgress: jest.fn()
   }
 }));
 
@@ -86,6 +89,12 @@ function buildWeeklyReport(overrides = {}) {
         mainSet: { durationMinutes: 25, description: '3x8 min tempo', targetPace: null, hrZone: 'Z3-Z4', rpe: 7 },
         cooldown: { durationMinutes: 10, description: 'Easy jog', targetPace: null, hrZone: 'Z1-Z2' }
       },
+      planPeriod: {
+        startsAt: new Date().toISOString(),
+        endsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        basedOnLastDays: 7,
+        rollingDays: 7
+      },
       weeklyPlan: [
         { day: 1, sessionType: 'easy_run', title: 'Easy aerobic run', durationMinutes: 45, distanceKm: 7, rpe: 4, description: 'Easy.' },
         { day: 2, sessionType: 'rest_or_xt', title: 'Rest', durationMinutes: 30, distanceKm: 0, rpe: 2, description: 'Rest day.' },
@@ -122,6 +131,20 @@ describe('Home (Dashboard) page', () => {
   beforeEach(() => {
     activitiesApi.getActivities.mockResolvedValue({ data: { activities: [] } });
     coachApi.weeklySummary.mockResolvedValue({ data: buildWeeklyReport() });
+    trainingApi.getProgress.mockResolvedValue({
+      data: {
+        progress: {
+          month: { currentKm: 40, goalKm: 100, percent: 40, runCount: 4, trainingLoad: 46, onTrack: true, daysLeftInMonth: 8, remainingKm: 60 },
+          year: { currentKm: 200, goalKm: 0, percent: null },
+          week: { currentKm: 32, goalKm: 30, percent: 100 },
+          gamification: { level: 5, title: 'Committed', xpInLevel: 0, xpToNextLevel: 50, xpPercent: 0 },
+          challenges: [],
+          nextObjectives: ['Set a monthly km goal in Profile.'],
+          personalRecords: { longestRunKm: 14.5, fastestPaceMinPerKm: 4.4 },
+          racePrediction: null
+        }
+      }
+    });
   });
 
   it('renders compact weekly insight with headline, plan, and stats link', async () => {
@@ -133,13 +156,12 @@ describe('Home (Dashboard) page', () => {
 
     expect(
       await screen.findByRole('heading', { name: /Solid build week, recovery looks healthy/i })
-    ).toBeInTheDocument();
+    ).toBeInTheDocument(); // Today hero headline (h2)
     expect(screen.getByTestId('readiness-phase-chip')).toHaveTextContent(/build/i);
-    expect(screen.getByText(/You ran 4 times for 32\.4 km/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/You ran 4 times for 32\.4 km/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Easy aerobic run/i).length).toBeGreaterThan(0);
 
-    const dayTiles = await screen.findAllByTestId('weekly-plan-day');
-    expect(dayTiles).toHaveLength(7);
+    expect(await screen.findByTestId('training-plan-offer')).toBeInTheDocument();
 
     const statsLink = screen.getByRole('link', { name: /All stats/i });
     expect(statsLink.getAttribute('href')).toMatch(/\/training-report/);
@@ -155,5 +177,6 @@ describe('Home (Dashboard) page', () => {
     expect(screen.getByTestId('today-hero')).toBeInTheDocument();
     expect(screen.getAllByText(/Easy aerobic run/i).length).toBeGreaterThan(0);
     expect(screen.getByTestId('home-recent-feed')).toBeInTheDocument();
+    expect(screen.getByTestId('training-goals-card')).toBeInTheDocument();
   });
 });

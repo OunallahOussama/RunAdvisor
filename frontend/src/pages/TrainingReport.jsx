@@ -11,36 +11,15 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import Container from '@mui/material/Container';
 import { alpha, useTheme } from '@mui/material/styles';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Filler,
-  Legend,
-  Tooltip as ChartTooltip
-} from 'chart.js';
-import { Bar, Line } from 'react-chartjs-2';
 import { recommendationsApi } from '../services/api';
 import WeeklyPlanDayCard from '../components/WeeklyPlanDayCard';
+import { StatsChartsGrid } from '../components/analytics/StatsCharts';
 import { DAY_LABELS } from '../utils/weeklyPlanShared';
 import { formatNumber, formatPaceLabel, formatMetric, formatPaceDeltaSec, TRAINING_METRIC_TOOLTIPS } from '../utils/format';
-import { chartScaleOptions, getChartTheme } from '../utils/chartTheme';
+import { getChartTheme } from '../utils/chartTheme';
 import { useRunAdvisorProfile } from '../context/RunAdvisorProfileContext';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Filler,
-  Legend,
-  ChartTooltip
-);
 
 const WINDOW_OPTIONS = [
   { value: 28, label: 'Last 28 days' },
@@ -146,14 +125,6 @@ function SectionHeader({ number, title, subtitle }) {
   );
 }
 
-function ChartCard({ children, height = 280 }) {
-  return (
-    <Box sx={reportCardSx({ p: 2 })}>
-      <Box sx={{ height }}>{children}</Box>
-    </Box>
-  );
-}
-
 function acwrTone(acwr) {
   if (acwr > 1.5) return 'risk';
   if (acwr > 1.3) return 'warn';
@@ -183,134 +154,6 @@ function readinessChipColor(phase = '') {
     default:
       return 'primary';
   }
-}
-
-function WeeklyLoadChart({ series }) {
-  const theme = useTheme();
-  const colors = getChartTheme(theme);
-
-  const data = {
-    labels: series.map((s) => s.label),
-    datasets: [
-      {
-        type: 'bar',
-        label: 'Weekly load',
-        data: series.map((s) => s.load),
-        backgroundColor: colors.primaryFill,
-        borderColor: colors.primary,
-        borderWidth: 1,
-        yAxisID: 'load'
-      },
-      {
-        type: 'line',
-        label: 'Distance (km)',
-        data: series.map((s) => s.totalDistanceKm),
-        borderColor: colors.secondary,
-        backgroundColor: colors.secondaryFill,
-        fill: false,
-        tension: 0.35,
-        yAxisID: 'distance'
-      }
-    ]
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: { color: colors.text }
-      }
-    },
-    scales: {
-      load: {
-        position: 'left',
-        ...chartScaleOptions(theme, { beginAtZero: true }),
-        title: { ...chartScaleOptions(theme).title, text: 'Load (TRIMP)' }
-      },
-      distance: {
-        position: 'right',
-        grid: { drawOnChartArea: false, color: colors.grid },
-        ticks: { color: colors.text },
-        title: { display: true, text: 'Distance (km)', color: colors.text },
-        beginAtZero: true
-      }
-    }
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
-function IntensityDistributionChart({ pct }) {
-  const theme = useTheme();
-  const colors = getChartTheme(theme);
-
-  const data = {
-    labels: ['Easy', 'Tempo', 'Threshold', 'VO2'],
-    datasets: [
-      {
-        label: 'Time in zone (%)',
-        data: [pct.easy || 0, pct.tempo || 0, pct.threshold || 0, pct.vo2 || 0],
-        backgroundColor: colors.zones
-      }
-    ]
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
-      y: {
-        beginAtZero: true,
-        max: 100,
-        ticks: { callback: (v) => `${v}%`, color: colors.text },
-        grid: { color: colors.grid }
-      }
-    }
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
-function PaceTrendChart({ activities }) {
-  const theme = useTheme();
-  const colors = getChartTheme(theme);
-  const sorted = [...(activities || [])].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-  const data = {
-    labels: sorted.map((a) => formatDate(a.date)),
-    datasets: [
-      {
-        label: 'Avg pace (min/km)',
-        data: sorted.map((a) => a.avgPaceMinPerKm),
-        borderColor: colors.secondary,
-        backgroundColor: colors.secondaryFill,
-        fill: true,
-        tension: 0.3
-      }
-    ]
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
-      y: {
-        reverse: true,
-        ticks: { color: colors.text },
-        grid: { color: colors.grid },
-        title: { display: true, text: 'min/km', color: colors.text }
-      }
-    }
-  };
-
-  return <Line data={data} options={options} />;
 }
 
 function SplitsTable({ activities }) {
@@ -617,7 +460,6 @@ function TrainingReport() {
     window.print();
   };
 
-  const intensity = useMemo(() => analytics?.intensityDistribution || {}, [analytics]);
   const load = useMemo(() => analytics?.trainingLoad || {}, [analytics]);
   const volume = useMemo(() => analytics?.volume || {}, [analytics]);
   const trends = useMemo(() => analytics?.trends || {}, [analytics]);
@@ -754,6 +596,15 @@ function TrainingReport() {
             ) : null}
           </Box>
 
+          {analytics ? (
+            <Container maxWidth="lg" disableGutters sx={{ mb: 3 }}>
+              <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.2, fontWeight: 700, display: 'block', mb: 1.5 }}>
+                Analytics overview
+              </Typography>
+              <StatsChartsGrid analytics={analytics} />
+            </Container>
+          ) : null}
+
           <SectionHeader number="01" title="Workload Analysis" subtitle="Acute load, ACWR, monotony & strain" />
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 1.5 }}>
             <StatCard
@@ -791,14 +642,6 @@ function TrainingReport() {
               ))}
             </Stack>
           ) : null}
-          <Box sx={{ mt: 2 }}>
-            {analytics?.weeklyLoadSeries?.length ? (
-              <ChartCard height={260}>
-                <WeeklyLoadChart series={analytics.weeklyLoadSeries} />
-              </ChartCard>
-            ) : null}
-          </Box>
-
           <SectionHeader number="02" title="Pace & Effort Analysis" subtitle="Intensity distribution and effort pattern" />
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 1.5, mb: 1.5 }}>
             <StatCard
@@ -817,14 +660,6 @@ function TrainingReport() {
               sublabel={analytics?.dataQuality?.hasHeartRate ? 'Live HR data' : 'No HR data — using pace proxy'}
             />
             <StatCard label="Total elevation" value={`${fmt(volume.totalElevationM, ' m', 0)}`} />
-          </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' }, gap: 1.5 }}>
-            <ChartCard height={240}>
-              <IntensityDistributionChart pct={intensity} />
-            </ChartCard>
-            <ChartCard height={240}>
-              <PaceTrendChart activities={analytics?.perActivity || []} />
-            </ChartCard>
           </Box>
           <Box sx={{ mt: 1.5 }}>
             <ParagraphCard>

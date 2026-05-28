@@ -8,6 +8,7 @@ const {
 } = require('../services/openaiCoach');
 const { searchActivitiesSemantically, buildSemanticVector } = require('../services/semanticSearch');
 const { buildLoadRiskAssessment } = require('../services/loadRisk');
+const { getWeeklyPlanCommitmentState } = require('../services/weeklyPlanCommitment');
 
 const router = express.Router();
 
@@ -71,6 +72,12 @@ async function handleWeeklySummary(req, res) {
 
     const loadRisk = buildLoadRiskAssessment(activities, req.user);
 
+    const planCommitment = await getWeeklyPlanCommitmentState(req.user, {
+      reportId: result.id,
+      generatedAt: result.generatedAt,
+      weeklyPlan: result.report?.weeklyPlan
+    });
+
     res.json({
       success: true,
       fromCache: result.fromCache,
@@ -84,7 +91,8 @@ async function handleWeeklySummary(req, res) {
       summary: result.summary,
       headline: result.headline,
       bullets: result.bullets,
-      loadRisk
+      loadRisk,
+      planCommitment
     });
   } catch (error) {
     console.error('Weekly summary error:', error);

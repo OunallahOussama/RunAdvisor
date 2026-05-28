@@ -1,4 +1,5 @@
-const CACHE_NAME = 'runadvisor-shell-v4';
+const CACHE_NAME = 'runadvisor-shell-v5';
+const STRAVA_SYNC_TAG = 'strava-activities-sync';
 const APP_SHELL_URL = '/';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [
@@ -48,6 +49,27 @@ function updateCache(request, response) {
 
   return response;
 }
+
+async function notifyClientsStravaSync(source) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  await Promise.all(
+    clients.map((client) =>
+      client.postMessage({ type: 'RUN_STRAVA_SYNC', source })
+    )
+  );
+}
+
+self.addEventListener('periodicsync', (event) => {
+  if (event.tag === STRAVA_SYNC_TAG) {
+    event.waitUntil(notifyClientsStravaSync('periodic'));
+  }
+});
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === STRAVA_SYNC_TAG) {
+    event.waitUntil(notifyClientsStravaSync('background-sync'));
+  }
+});
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();

@@ -9,7 +9,9 @@ const consentSchema = new mongoose.Schema({
   notifications: {
     browser: { type: Boolean, default: false },
     recommendations: { type: Boolean, default: true },
-    weeklyReport: { type: Boolean, default: true }
+    weeklyReport: { type: Boolean, default: true },
+    /** Background Strava sync while app/PWA is open or periodic sync is allowed. */
+    stravaBackgroundSync: { type: Boolean, default: true }
   },
   /** When false, skip async Strava description insight write-back (activity:write). */
   stravaActivityInsights: { type: Boolean, default: true },
@@ -91,6 +93,33 @@ const userSchema = new mongoose.Schema({
   goalRaceName: String,
   goalRaceDate: Date,
   goalRaceDistanceKm: Number,
+  /** Monthly distance target (km) — home progress ring / gamification. */
+  monthlyDistanceGoalKm: Number,
+  /** Yearly distance target (km) — YTD progress. */
+  yearlyDistanceGoalKm: Number,
+  trainingChallenges: [{
+    kind: {
+      type: String,
+      enum: [
+        'monthly_km',
+        'yearly_km',
+        'weekly_km',
+        'pace_cap',
+        'pr_longest_km',
+        'pr_fastest_pace',
+        'pr_elevation',
+        'race_prediction',
+        'custom_km'
+      ],
+      required: true
+    },
+    title: { type: String, trim: true, maxlength: 80, default: '' },
+    targetKm: Number,
+    targetPaceMinPerKm: Number,
+    raceDistanceKm: Number,
+    active: { type: Boolean, default: true },
+    createdAt: { type: Date, default: Date.now }
+  }],
 
   // Vector embeddings for preferences
   preferenceVector: [Number],
@@ -109,6 +138,21 @@ const userSchema = new mongoose.Schema({
   socialBio: { type: String, trim: true, maxlength: 280, default: '' },
   lastLoginAt: Date,
   lastActiveAt: Date,
+
+  /** Active coach weekly plan: follow / decline + adherence snapshot. */
+  weeklyPlanCommitment: {
+    reportKey: { type: String, default: null },
+    reportGeneratedAt: { type: Date, default: null },
+    status: {
+      type: String,
+      enum: ['pending', 'following', 'declined'],
+      default: 'pending'
+    },
+    decidedAt: { type: Date, default: null },
+    appliedCheckAt: { type: Date, default: null },
+    appliedScore: { type: Number, default: null },
+    appliedNote: { type: String, default: '' }
+  },
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

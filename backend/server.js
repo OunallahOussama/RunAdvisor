@@ -59,6 +59,7 @@ app.use('/api/recommendations', require('./routes/recommendations'));
 app.use('/api/vector-search', require('./routes/vectorSearch'));
 app.use('/api/coach/chat', require('./routes/coachChat'));
 app.use('/api/coach', require('./routes/coach'));
+app.use('/api/training', require('./routes/training'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/strava', stravaLimiter, require('./routes/strava'));
 app.use('/api/social', require('./routes/social'));
