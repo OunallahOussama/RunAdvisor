@@ -25,6 +25,9 @@ git reset --hard origin/main
 echo "Ensuring swap (helps small instances)..."
 bash scripts/ec2-add-swap.sh 2>/dev/null || true
 
+echo "Freeing Docker disk space (required after failed builds)..."
+bash scripts/ec2-docker-prune.sh
+
 echo "Building and starting stack (frontend build may take 10+ minutes on t3.micro)..."
 export DOCKER_BUILDKIT=0
 export COMPOSE_DOCKER_CLI_BUILD=0

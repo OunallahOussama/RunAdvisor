@@ -27,7 +27,12 @@ if [[ -f scripts/ec2-add-swap.sh ]]; then
   bash scripts/ec2-add-swap.sh || true
 fi
 
-git pull origin main
+if [[ -f scripts/ec2-docker-prune.sh ]]; then
+  bash scripts/ec2-docker-prune.sh || true
+fi
+
+git fetch origin main
+git reset --hard origin/main
 
 echo "Rebuilding (backend first, then frontend — can take 10–15 min on t3.micro)..."
 "${COMPOSE[@]}" --env-file .env.ec2 -f docker-compose.ec2.yml build backend

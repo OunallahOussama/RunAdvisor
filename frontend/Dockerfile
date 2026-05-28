@@ -26,7 +26,8 @@ ENV REACT_APP_STRAVA_REDIRECT_URI=$REACT_APP_STRAVA_REDIRECT_URI
 
 COPY package*.json ./
 
-RUN npm install
+# ci is faster and smaller than install; flags reduce metadata churn on small disks
+RUN npm ci --no-audit --no-fund
 
 COPY . .
 
